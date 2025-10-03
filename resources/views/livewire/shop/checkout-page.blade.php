@@ -178,124 +178,138 @@
 @push('scripts')
 <script src="https://js.stripe.com/v3/"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Starting Stripe initialization...');
+// Wait for everything to load
+window.addEventListener('load', function() {
+    console.log('🚀 Page fully loaded, initializing Stripe...');
+    
+    // Hard-coded Stripe key for testing
+    const stripeKey = 'pk_test_51S0gYfKyfRZGi0cj0Q2x7dEWuN4totRdghbjZQa8bzIA7mPjSeD6aAYgjbHOwahhhXhgKAFHT3tbukYLzCP8IwPq00kpxq5pIK';
+    console.log('Using Stripe key:', stripeKey);
     
     // Initialize Stripe
-    const stripe = Stripe('{{ env('STRIPE_PUBLISHABLE_KEY') }}');
-    const elements = stripe.elements();
-
-    // Create a single card element (this always works)
-    const cardElement = elements.create('card', {
-        style: {
-            base: {
-                fontSize: '16px',
-                color: '#ffffff',
-                '::placeholder': {
-                    color: '#9ca3af',
+    let stripe, elements, cardElement;
+    
+    try {
+        stripe = Stripe(stripeKey);
+        elements = stripe.elements();
+        console.log('✅ Stripe initialized successfully');
+        
+        // Create card element
+        cardElement = elements.create('card', {
+            style: {
+                base: {
+                    fontSize: '16px',
+                    color: '#ffffff',
+                    backgroundColor: 'transparent',
+                    '::placeholder': {
+                        color: '#9ca3af',
+                    },
+                },
+                invalid: {
+                    color: '#ef4444',
                 },
             },
-        },
-    });
+            hidePostalCode: true
+        });
+        console.log('✅ Card element created');
+        
+    } catch (error) {
+        console.error('❌ Failed to initialize Stripe:', error);
+        return;
+    }
     
     let cardMounted = false;
 
-    // Function to mount/unmount card element
-    function toggleCardElement() {
+    // Mount card element immediately if card payment is selected
+    function mountCardElement() {
         const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
         const cardContainer = document.getElementById('card-element');
         
-        console.log('Toggle called, payment method:', paymentMethod);
-        console.log('Card container found:', !!cardContainer);
+        console.log('🔍 Payment method:', paymentMethod);
+        console.log('🔍 Card container exists:', !!cardContainer);
         
-        if (paymentMethod === 'card' && !cardMounted && cardContainer) {
+        if (paymentMethod === 'card' && cardContainer && !cardMounted) {
             try {
                 cardElement.mount('#card-element');
                 cardMounted = true;
-                console.log('✅ Stripe card element mounted successfully!');
+                console.log('✅ Card element mounted successfully!');
+                
+                // Test if we can focus the element
+                setTimeout(() => {
+                    cardElement.focus();
+                    console.log('✅ Card element focused');
+                }, 500);
+                
             } catch (error) {
-                console.error('❌ Error mounting card element:', error);
+                console.error('❌ Failed to mount card element:', error);
             }
         } else if (paymentMethod === 'cod' && cardMounted) {
-            cardElement.unmount();
-            cardMounted = false;
-            console.log('Card element unmounted');
+            try {
+                cardElement.unmount();
+                cardMounted = false;
+                console.log('✅ Card element unmounted');
+            } catch (error) {
+                console.error('❌ Failed to unmount card element:', error);
+            }
         }
     }
 
     // Handle payment method changes
-    document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+    const paymentRadios = document.querySelectorAll('input[name="payment_method"]');
+    console.log('📻 Found payment radios:', paymentRadios.length);
+    
+    paymentRadios.forEach(radio => {
         radio.addEventListener('change', function() {
-            console.log('Payment method changed to:', this.value);
-            setTimeout(toggleCardElement, 100);
+            console.log('🔄 Payment method changed to:', this.value);
+            setTimeout(mountCardElement, 200);
         });
     });
 
-    // Initial setup with delay to ensure DOM is ready
-    setTimeout(function() {
-        console.log('Running initial toggle...');
-        toggleCardElement();
-    }, 1000);
-
-    // Handle card changes
-    cardElement.on('change', function(event) {
-        console.log('Card changed:', event);
-        const displayError = document.getElementById('card-errors');
-        if (event.error) {
-            displayError.textContent = event.error.message;
+    // Initial mount with multiple attempts
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    function tryMount() {
+        attempts++;
+        console.log(`🔄 Mount attempt ${attempts}...`);
+        
+        const cardContainer = document.getElementById('card-element');
+        if (cardContainer) {
+            mountCardElement();
+        } else if (attempts < maxAttempts) {
+            setTimeout(tryMount, 1000);
         } else {
-            displayError.textContent = '';
+            console.error('❌ Could not find card container after 5 attempts');
         }
-    });
+    }
+    
+    tryMount();
 
-    // Handle form submission
-    const form = document.querySelector('form');
-    if (form) {
-        form.addEventListener('submit', async function(event) {
-            const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
-            
-            if (paymentMethod !== 'card') {
-                console.log('COD payment, letting Livewire handle it');
-                return;
-            }
-
-            event.preventDefault();
-            console.log('Processing card payment...');
-
-            const submitButton = form.querySelector('button[type="submit"]');
-            submitButton.disabled = true;
-            submitButton.innerHTML = '<span>Processing Payment...</span>';
-
-            try {
-                const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
-                    type: 'card',
-                    card: cardElement,
-                    billing_details: {
-                        name: document.querySelector('input[wire\\:model="recipient_name"]').value,
-                    }
-                });
-
-                if (error) {
-                    console.error('Stripe error:', error);
-                    document.getElementById('card-errors').textContent = error.message;
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = '<span>Place Order</span>';
-                    return;
+    // Handle card validation
+    if (cardElement) {
+        cardElement.on('change', function(event) {
+            console.log('💳 Card changed:', event.complete ? 'Complete' : 'Incomplete');
+            const displayError = document.getElementById('card-errors');
+            if (displayError) {
+                if (event.error) {
+                    displayError.textContent = event.error.message;
+                    console.log('❌ Card error:', event.error.message);
+                } else {
+                    displayError.textContent = '';
                 }
-
-                console.log('Payment method created successfully!');
-                @this.processStripePayment(stripePaymentMethod.id);
-
-            } catch (err) {
-                console.error('Payment error:', err);
-                document.getElementById('card-errors').textContent = 'Payment failed. Please try again.';
-                submitButton.disabled = false;
-                submitButton.innerHTML = '<span>Place Order</span>';
             }
+        });
+
+        cardElement.on('ready', function() {
+            console.log('✅ Card element is ready for input!');
+        });
+
+        cardElement.on('focus', function() {
+            console.log('✅ Card element focused!');
         });
     }
 
-    console.log('Stripe setup complete!');
+    console.log('🎉 Stripe setup complete!');
 });
 </script>
 @endpush
