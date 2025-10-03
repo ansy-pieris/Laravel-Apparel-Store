@@ -43,12 +43,7 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
-        // MongoDB Atlas Connection
-        'mongodb' => [
-            'driver' => 'mongodb',
-            'dsn' => env('MONGODB_CONNECTION'),
-            'database' => env('MONGODB_DATABASE', 'apparel_store'),
-        ],
+
 
         'mysql' => [
             'driver' => 'mysql',

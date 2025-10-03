@@ -132,53 +132,22 @@
                             <span>Card Payment</span>
                         </label>
 
-                        <!-- Card Details Section -->
+                        <!-- Stripe Card Details Section -->
                         @if($payment_method === 'card')
-                            <div class="space-y-2 mt-4">
-                                <label class="block font-semibold">Card Type</label>
-                                <div class="flex items-center space-x-4">
-                                    <label class="flex items-center space-x-2">
-                                        <input type="radio" wire:model="card_type" value="visa" class="accent-white">
-                                        <span>Visa</span>
-                                    </label>
-                                    <label class="flex items-center space-x-2">
-                                        <input type="radio" wire:model="card_type" value="mastercard" class="accent-white">
-                                        <span>MasterCard</span>
-                                    </label>
+                            <div class="space-y-4 mt-4">
+                                <label class="block font-semibold">Card Details</label>
+                                
+                                <!-- Stripe Elements Container -->
+                                <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded">
+                                    <!-- Stripe Elements will create form elements here -->
                                 </div>
-                                @error('card_type')
+                                
+                                <!-- Stripe Errors -->
+                                <div id="card-errors" role="alert" class="text-red-500 text-sm"></div>
+                                
+                                @error('payment_error')
                                     <p class="text-red-500 text-sm">{{ $message }}</p>
                                 @enderror
-
-                                <div>
-                                    <label class="block font-semibold">Card Number</label>
-                                    <input type="text" wire:model="card_number" 
-                                           class="w-full p-2 bg-gray-800 text-white rounded border @error('card_number') border-red-500 @else border-gray-600 @enderror" 
-                                           placeholder="1234 5678 9012 3456">
-                                    @error('card_number')
-                                        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                <div>
-                                    <label class="block font-semibold">Name on Card</label>
-                                    <input type="text" wire:model="card_name" 
-                                           class="w-full p-2 bg-gray-800 text-white rounded border @error('card_name') border-red-500 @else border-gray-600 @enderror" 
-                                           placeholder="John Doe">
-                                    @error('card_name')
-                                        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                <div>
-                                    <label class="block font-semibold">CVV</label>
-                                    <input type="text" wire:model="card_cvv" 
-                                           class="w-full p-2 bg-gray-800 text-white rounded border @error('card_cvv') border-red-500 @else border-gray-600 @enderror" 
-                                           placeholder="123">
-                                    @error('card_cvv')
-                                        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                                    @enderror
-                                </div>
                             </div>
                         @endif
                     </div>
@@ -201,3 +170,118 @@
         </form>
     </div>
 </div>
+
+@push('scripts')
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Stripe
+    const stripe = Stripe('{{ env('STRIPE_PUBLISHABLE_KEY') }}');
+    const elements = stripe.elements({
+        appearance: {
+            theme: 'night',
+            variables: {
+                colorPrimary: '#dc2626',
+                colorBackground: '#1f2937',
+                colorText: '#ffffff',
+                colorDanger: '#ef4444',
+                fontFamily: 'system-ui, sans-serif',
+                borderRadius: '6px',
+            }
+        }
+    });
+
+    // Create card element
+    const cardElement = elements.create('card');
+    let cardMounted = false;
+
+    // Function to mount/unmount card element based on payment method
+    function toggleCardElement() {
+        const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+        const cardContainer = document.getElementById('card-element');
+        
+        if (paymentMethod === 'card' && !cardMounted) {
+            cardElement.mount('#card-element');
+            cardMounted = true;
+        } else if (paymentMethod === 'cod' && cardMounted) {
+            cardElement.unmount();
+            cardMounted = false;
+        }
+    }
+
+    // Handle payment method changes
+    document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+        radio.addEventListener('change', toggleCardElement);
+    });
+
+    // Initial setup
+    toggleCardElement();
+
+    // Handle real-time validation errors
+    cardElement.on('change', function(event) {
+        const displayError = document.getElementById('card-errors');
+        if (event.error) {
+            displayError.textContent = event.error.message;
+        } else {
+            displayError.textContent = '';
+        }
+    });
+
+    // Handle form submission for card payments
+    const form = document.querySelector('form');
+    form.addEventListener('submit', async function(event) {
+        const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+        
+        if (paymentMethod !== 'card') {
+            return; // Let Livewire handle COD normally
+        }
+
+        event.preventDefault();
+
+        // Disable submit button
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span>Processing Payment...</span>';
+
+        try {
+            // Create payment method
+            const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
+                type: 'card',
+                card: cardElement,
+                billing_details: {
+                    name: document.querySelector('input[wire\\:model="recipient_name"]').value,
+                }
+            });
+
+            if (error) {
+                // Show error to customer
+                document.getElementById('card-errors').textContent = error.message;
+                submitButton.disabled = false;
+                submitButton.innerHTML = '<span>Place Order</span>';
+                return;
+            }
+
+            // Send payment method ID to Livewire
+            @this.processStripePayment(stripePaymentMethod.id);
+
+        } catch (err) {
+            console.error('Stripe error:', err);
+            document.getElementById('card-errors').textContent = 'An unexpected error occurred.';
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<span>Place Order</span>';
+        }
+    });
+
+    // Listen for payment confirmation from server
+    Livewire.on('confirmPayment', async (data) => {
+        const {error} = await stripe.confirmCardPayment(data.client_secret);
+        
+        if (error) {
+            @this.handlePaymentError(error.message);
+        } else {
+            @this.completeOrder();
+        }
+    });
+});
+</script>
+@endpush

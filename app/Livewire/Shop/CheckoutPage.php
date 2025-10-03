@@ -9,6 +9,8 @@ use App\Models\ShippingAddress;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Stripe\Stripe;
+use Stripe\PaymentIntent;
 
 class CheckoutPage extends Component
 {
@@ -27,10 +29,8 @@ class CheckoutPage extends Component
 
     // Payment properties
     public $payment_method = 'cod';
-    public $card_type = '';
-    public $card_number = '';
-    public $card_name = '';
-    public $card_cvv = '';
+    public $stripe_payment_method_id = '';
+    public $stripe_payment_intent_id = '';
 
     protected $rules = [
         'recipient_name' => 'required|string|max:255',
@@ -39,10 +39,6 @@ class CheckoutPage extends Component
         'city' => 'required|string|max:100',
         'postal_code' => 'required|string|max:10',
         'payment_method' => 'required|in:cod,card',
-        'card_type' => 'required_if:payment_method,card|in:visa,mastercard',
-        'card_number' => 'required_if:payment_method,card|string|max:19',
-        'card_name' => 'required_if:payment_method,card|string|max:255',
-        'card_cvv' => 'required_if:payment_method,card|string|max:4',
     ];
 
     protected $messages = [
@@ -51,10 +47,6 @@ class CheckoutPage extends Component
         'address.required' => 'Street address is required.',
         'city.required' => 'City is required.',
         'postal_code.required' => 'Postal code is required.',
-        'card_type.required_if' => 'Card type is required for card payment.',
-        'card_number.required_if' => 'Card number is required for card payment.',
-        'card_name.required_if' => 'Name on card is required for card payment.',
-        'card_cvv.required_if' => 'CVV is required for card payment.',
     ];
 
     public function mount()
@@ -106,8 +98,168 @@ class CheckoutPage extends Component
         $this->total = $this->subtotal + $this->tax;
     }
 
+    public function processStripePayment($paymentMethodId)
+    {
+        try {
+            // Validate form first
+            $this->validate();
+            
+            // Set Stripe API key
+            Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
+            
+            // Store payment method ID
+            $this->stripe_payment_method_id = $paymentMethodId;
+            
+            // Create payment intent
+            $paymentIntent = PaymentIntent::create([
+                'amount' => round($this->total * 100), // Convert to cents
+                'currency' => 'lkr', // Sri Lankan Rupees
+                'payment_method' => $paymentMethodId,
+                'confirmation_method' => 'manual',
+                'confirm' => true,
+                'return_url' => route('home'),
+                'metadata' => [
+                    'user_id' => Auth::id(),
+                    'user_email' => Auth::user()->email,
+                    'order_total' => $this->total,
+                ]
+            ]);
+            
+            // Store payment intent ID
+            $this->stripe_payment_intent_id = $paymentIntent->id;
+            
+            if ($paymentIntent->status === 'requires_action') {
+                // 3D Secure authentication required
+                $this->dispatch('confirmPayment', [
+                    'client_secret' => $paymentIntent->client_secret
+                ]);
+            } else if ($paymentIntent->status === 'succeeded') {
+                // Payment succeeded immediately
+                $this->completeOrder();
+            } else {
+                // Payment failed
+                $this->handlePaymentError('Payment failed. Please try again.');
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Stripe payment error: ' . $e->getMessage());
+            $this->handlePaymentError('Payment processing failed. Please try again.');
+        }
+    }
+    
+    public function handlePaymentError($message)
+    {
+        $this->addError('payment_error', $message);
+        
+        // Re-enable the submit button via JavaScript
+        $this->dispatch('paymentError');
+    }
+    
+    public function completeOrder()
+    {
+        // Complete the order after successful payment
+        $this->createOrder();
+    }
+    
+    private function createOrder()
+    {
+        try {
+            DB::beginTransaction();
+
+            // Generate unique order ID
+            do {
+                $orderId = 'ORD-' . strtoupper(uniqid());
+            } while (Order::where('order_id', $orderId)->exists());
+
+            // Determine payment status based on payment method
+            $paymentStatus = 'pending';
+            if ($this->payment_method === 'card' && $this->stripe_payment_intent_id) {
+                $paymentStatus = 'paid';
+            }
+
+            // Create order
+            $order = Order::create([
+                'order_id' => $orderId,
+                'user_id' => Auth::id(),
+                'total_amount' => $this->total,
+                'status' => 'pending',
+                'payment_method' => $this->payment_method,
+                'payment_status' => $paymentStatus,
+                'stripe_payment_intent_id' => $this->stripe_payment_intent_id,
+                'notes' => null,
+            ]);
+
+            // Create order items
+            foreach ($this->items as $item) {
+                OrderItem::create([
+                    'order_id' => $order->order_id,
+                    'product_id' => $item->product_id,
+                    'quantity' => $item->quantity,
+                    'price' => $item->product->price,
+                    'size' => $item->size,
+                ]);
+            }
+
+            // Create shipping address
+            ShippingAddress::create([
+                'user_id' => Auth::id(),
+                'order_id' => $order->order_id,
+                'recipient_name' => $this->recipient_name,
+                'phone' => $this->phone,
+                'address' => $this->address,
+                'city' => $this->city,
+                'postal_code' => $this->postal_code,
+            ]);
+
+            // Clear the cart
+            CartItem::where('user_id', Auth::id())->delete();
+
+            DB::commit();
+
+            // Send order confirmation email
+            try {
+                $googleMailService = new \App\Services\GoogleMailService();
+                $user = Auth::user();
+                $orderWithItems = $order->load(['items.product']);
+                $googleMailService->sendOrderConfirmation($orderWithItems, $user->email);
+                \Log::info('Order confirmation email sent successfully', ['order_id' => $order->order_id, 'email' => $user->email]);
+            } catch (\Exception $e) {
+                \Log::error('Order confirmation email failed: ' . $e->getMessage(), ['order_id' => $order->order_id]);
+            }
+
+            // Success message
+            $deliveryDate = now()->addDays(4)->format('M j, Y');
+            $paymentMessage = $this->payment_method === 'card' ? 'Your payment has been processed successfully.' : '';
+            session()->flash('order_success', "Thank you for your purchase! {$paymentMessage} Order #{$order->order_id} will be delivered by {$deliveryDate}. A confirmation email has been sent to {$user->email}.");
+            
+            // Dispatch event to update cart counter
+            $this->dispatch('cartUpdated');
+
+            // Redirect to home
+            return redirect()->route('home');
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            \Log::error('Order creation failed: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+                'stripe_payment_intent_id' => $this->stripe_payment_intent_id
+            ]);
+            
+            $this->handlePaymentError('Order processing failed. Please contact support.');
+        }
+    }
+
     public function placeOrder()
     {
+        // This method now only handles COD payments
+        // Card payments are handled by JavaScript and processStripePayment
+        
+        if ($this->payment_method === 'card') {
+            // Card payments should be handled by JavaScript and processStripePayment
+            $this->addError('payment_error', 'Please use the card form above for card payments.');
+            return;
+        }
+        
         $this->validate();
 
         if ($this->itemCount == 0) {
@@ -190,21 +342,31 @@ class CheckoutPage extends Component
 
         } catch (\Exception $e) {
             DB::rollback();
-            session()->flash('error', 'Something went wrong. Please try again.');
-            \Log::error('Order placement failed: ' . $e->getMessage());
+            
+            // Provide more specific error messages
+            $errorMessage = 'Something went wrong. Please try again.';
+            
+            if (str_contains($e->getMessage(), 'Insufficient stock')) {
+                $errorMessage = $e->getMessage();
+            } elseif (str_contains($e->getMessage(), 'Duplicate entry') || str_contains($e->getMessage(), 'Integrity constraint violation')) {
+                $errorMessage = 'Order processing error. Please try again.';
+            } elseif (str_contains($e->getMessage(), 'Connection refused') || str_contains($e->getMessage(), 'Connection timed out')) {
+                $errorMessage = 'Database connection error. Please try again.';
+            }
+            
+            session()->flash('error', $errorMessage);
+            \Log::error('Order placement failed: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+                'cart_items_count' => count($this->items),
+                'total' => $this->total
+            ]);
+            
+            // Don't redirect on error, stay on checkout page
+            return;
         }
     }
 
-    public function updatedPaymentMethod()
-    {
-        // Clear card details when switching to COD
-        if ($this->payment_method === 'cod') {
-            $this->card_type = '';
-            $this->card_number = '';
-            $this->card_name = '';
-            $this->card_cvv = '';
-        }
-    }
+
 
     public function render()
     {
