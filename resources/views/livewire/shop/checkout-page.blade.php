@@ -202,12 +202,39 @@ console.log('Card CVC input exists:', !!document.getElementById('card-cvc-input'
 console.log('Place order button exists:', !!document.getElementById('place-order-btn'));
 console.log('Form exists:', !!document.querySelector('form'));
 
+// IMMEDIATE BUTTON TEST - No waiting for DOM
+const immediateBtn = document.getElementById('place-order-btn');
+if (immediateBtn) {
+    console.log('✅ FOUND BUTTON IMMEDIATELY - Attaching click handler');
+    immediateBtn.onclick = function() {
+        alert('BUTTON CLICKED - IMMEDIATE HANDLER WORKS!');
+        console.log('🚨 IMMEDIATE BUTTON CLICK DETECTED');
+        return false;
+    };
+} else {
+    console.log('❌ BUTTON NOT FOUND IMMEDIATELY');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM loaded, checking Stripe availability...');
     
     // Double-check elements after DOM loads
     console.log('After DOM load - Card number input:', !!document.getElementById('card-number-input'));
     console.log('After DOM load - Place order button:', !!document.getElementById('place-order-btn'));
+    
+    // SECONDARY BUTTON TEST - After DOM loads
+    const domBtn = document.getElementById('place-order-btn');
+    if (domBtn) {
+        console.log('✅ FOUND BUTTON AFTER DOM LOAD');
+        domBtn.addEventListener('click', function(e) {
+            alert('DOM LOADED BUTTON CLICK WORKS!');
+            console.log('🚨 DOM BUTTON CLICK DETECTED');
+            e.preventDefault();
+            return false;
+        });
+    } else {
+        console.log('❌ BUTTON STILL NOT FOUND AFTER DOM LOAD');
+    }
     
     // Check if Stripe is loaded
     if (typeof Stripe === 'undefined') {
@@ -565,4 +592,29 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('🎉 Setup complete - card field should work now!');
 });
+
+// CONTINUOUS BUTTON SEARCH - Every 2 seconds for 10 seconds
+let buttonCheckCount = 0;
+const buttonInterval = setInterval(function() {
+    buttonCheckCount++;
+    const lateBtn = document.getElementById('place-order-btn');
+    console.log(`🔍 Button check #${buttonCheckCount}: ${lateBtn ? 'FOUND' : 'NOT FOUND'}`);
+    
+    if (lateBtn && !lateBtn.hasAttribute('data-tested')) {
+        console.log('✅ LATE BUTTON FOUND - Adding handler');
+        lateBtn.setAttribute('data-tested', 'true');
+        lateBtn.onclick = function(e) {
+            alert('LATE BUTTON CLICK WORKS!');
+            console.log('🚨 LATE BUTTON CLICK DETECTED');
+            e.preventDefault();
+            return false;
+        };
+        clearInterval(buttonInterval);
+    }
+    
+    if (buttonCheckCount >= 5) {
+        console.log('❌ STOPPED LOOKING FOR BUTTON AFTER 5 ATTEMPTS');
+        clearInterval(buttonInterval);
+    }
+}, 2000);
 </script>
