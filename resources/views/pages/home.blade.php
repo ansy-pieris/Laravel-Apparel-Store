@@ -10,23 +10,23 @@
       <div class="relative h-full overflow-hidden rounded-lg">
         {{-- Item 1 --}}
         <div class="hidden duration-[1200ms] ease-in-out" data-carousel-item="active">
-          <img src="{{ asset('images/heroes/hero.jpg') }}" 
-               class="absolute block w-full h-full object-cover" 
-               alt="Fashion Collection Hero"
+          <img src="{{ asset('images/Ares3.jpg') }}" 
+               class="absolute block w-full h-full object-contain" 
+               alt="Slide 1"
                onerror="this.onerror=null; this.src='{{ asset('images/placeholder.jpg') }}';">
         </div>
         {{-- Item 2 --}}
         <div class="hidden duration-[1200ms] ease-in-out" data-carousel-item>
-          <img src="{{ asset('images/heroes/hero2.jpg') }}" 
+          <img src="{{ asset('images/hero3.webp') }}" 
                class="absolute block w-full h-full object-cover" 
-               alt="Latest Apparel Collection"
+               alt="Slide 2"
                onerror="this.onerror=null; this.src='{{ asset('images/placeholder.jpg') }}';">
         </div>
         {{-- Item 3 --}}
         <div class="hidden duration-[1200ms] ease-in-out" data-carousel-item>
           <img src="{{ asset('images/hero2.jpg') }}" 
                class="absolute block w-full h-full object-cover" 
-               alt="Premium Fashion Store"
+               alt="Slide 3"
                onerror="this.onerror=null; this.src='{{ asset('images/placeholder.jpg') }}';">
         </div>
       </div>
