@@ -173,6 +173,7 @@
                     </div>
 
                     <button type="submit" 
+                            id="place-order-btn"
                             class="mt-6 w-full bg-red-600 text-white py-2 rounded text-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
                             wire:loading.attr="disabled">
                         <span wire:loading.remove>Place Order</span>
@@ -379,21 +380,42 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('✅ Enhanced validation ready!');
     
+    // Debug button clicks
+    const placeOrderBtn = document.getElementById('place-order-btn');
+    if (placeOrderBtn) {
+        placeOrderBtn.addEventListener('click', function(e) {
+            console.log('🖱️ Place Order button clicked!');
+            const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+            console.log('Payment method at button click:', paymentMethod);
+        });
+    }
+    
     // Handle form submission
     const form = document.querySelector('form');
     if (form) {
+        console.log('✅ Form submission handler attached');
+        
         form.addEventListener('submit', async function(event) {
+            console.log('📝 Form submit event triggered');
             const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
             console.log('Form submission - payment method:', paymentMethod);
             
             // Update Livewire property before submission
-            @this.set('payment_method', paymentMethod);
-            
-            if (paymentMethod !== 'card') {
-                return; // Let Livewire handle COD
+            try {
+                await @this.set('payment_method', paymentMethod);
+                console.log('✅ Payment method set in Livewire');
+            } catch (error) {
+                console.log('❌ Error setting payment method:', error);
             }
             
+            if (paymentMethod !== 'card') {
+                console.log('✅ COD order - letting Livewire handle submission');
+                return; // Let Livewire handle COD normally
+            }
+            
+            // Only prevent default for card payments
             event.preventDefault();
+            console.log('🚀 Card payment - handling with Stripe');
             
             const submitButton = form.querySelector('button[type="submit"]');
             const originalText = submitButton.innerHTML;
