@@ -132,28 +132,26 @@
                             <span>Card Payment</span>
                         </label>
 
-                        <!-- Stripe Card Details Section -->
-                        @if($payment_method === 'card')
-                            <div class="space-y-4 mt-4">
-                                <label class="block font-semibold">Card Details*</label>
-                                <p class="text-sm text-gray-400">Use test card: 4242 4242 4242 4242</p>
-                                
-                                <!-- Single Card Element (simpler approach) -->
-                                <div>
-                                    <label class="block text-sm font-medium mb-1">Card Information</label>
-                                    <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px]">
-                                        <!-- Stripe card element will be mounted here -->
-                                    </div>
+                        <!-- Stripe Card Details Section - Always Visible -->
+                        <div class="space-y-4 mt-4">
+                            <label class="block font-semibold">Card Details*</label>
+                            <p class="text-sm text-gray-400">Use test card: 4242 4242 4242 4242</p>
+                            
+                            <!-- Single Card Element (simpler approach) -->
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Card Information</label>
+                                <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px]">
+                                    <!-- Stripe card element will be mounted here -->
                                 </div>
-                                
-                                <!-- Stripe Errors -->
-                                <div id="card-errors" role="alert" class="text-red-500 text-sm min-h-[20px]"></div>
-                                
-                                @error('payment_error')
-                                    <p class="text-red-500 text-sm">{{ $message }}</p>
-                                @enderror
                             </div>
-                        @endif
+                            
+                            <!-- Stripe Errors -->
+                            <div id="card-errors" role="alert" class="text-red-500 text-sm min-h-[20px]"></div>
+                            
+                            @error('payment_error')
+                                <p class="text-red-500 text-sm">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
 
                     <button type="submit" 
