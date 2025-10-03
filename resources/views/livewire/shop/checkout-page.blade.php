@@ -132,31 +132,34 @@
                             <span>Card Payment</span>
                         </label>
 
-                        <!-- Stripe Card Details Section -->
+                        <!-- Simple Card Details Section - NO STRIPE ELEMENTS -->
                         <div wire:ignore class="space-y-4 mt-4 hidden" id="card-section">
                             <label class="block font-semibold">Card Details*</label>
                             <p class="text-sm text-gray-400">Use test card: 4242 4242 4242 4242</p>
                             
-                            <!-- Separate Card Fields -->
+                            <!-- Simple HTML Inputs -->
                             <div>
-                                <label class="block text-sm font-medium mb-1">Card Number</label>
-                                <div id="card-number-element" class="p-3 bg-gray-800 border border-gray-600 rounded h-[40px] cursor-text hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                                    <!-- Card number element -->
-                                </div>
+                                <label class="block text-sm font-medium mb-1 text-white">Card Number</label>
+                                <input type="text" id="card-number-input" 
+                                       class="w-full p-3 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" 
+                                       placeholder="1234 5678 9012 3456" 
+                                       maxlength="19">
                             </div>
                             
                             <div class="flex space-x-4">
                                 <div class="flex-1">
-                                    <label class="block text-sm font-medium mb-1">Expiry</label>
-                                    <div id="card-expiry-element" class="p-3 bg-gray-800 border border-gray-600 rounded h-[40px] cursor-text hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                                        <!-- Card expiry element -->
-                                    </div>
+                                    <label class="block text-sm font-medium mb-1 text-white">Expiry</label>
+                                    <input type="text" id="card-expiry-input" 
+                                           class="w-full p-3 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" 
+                                           placeholder="MM/YY" 
+                                           maxlength="5">
                                 </div>
                                 <div class="flex-1">
-                                    <label class="block text-sm font-medium mb-1">CVC</label>
-                                    <div id="card-cvc-element" class="p-3 bg-gray-800 border border-gray-600 rounded h-[40px] cursor-text hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                                        <!-- Card CVC element -->
-                                    </div>
+                                    <label class="block text-sm font-medium mb-1 text-white">CVC</label>
+                                    <input type="text" id="card-cvc-input" 
+                                           class="w-full p-3 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" 
+                                           placeholder="123" 
+                                           maxlength="4">
                                 </div>
                             </div>
                             
@@ -208,57 +211,44 @@ document.addEventListener('DOMContentLoaded', function() {
     const stripe = Stripe('{{ config('services.stripe.key') }}');
     const elements = stripe.elements();
     
-    // Create separate card elements with clean styling
-    const cardNumberElement = elements.create('cardNumber', {
-        style: {
-            base: {
-                fontSize: '16px',
-                color: '#ffffff',
-                fontFamily: 'Arial, sans-serif',
-                lineHeight: '16px',
-                '::placeholder': {
-                    color: '#9ca3af',
-                }
-            },
-            invalid: {
-                color: '#ef4444',
-            }
-        }
-    });
+    // Get the simple HTML input elements - NO STRIPE ELEMENTS
+    const cardNumberInput = document.getElementById('card-number-input');
+    const cardExpiryInput = document.getElementById('card-expiry-input');
+    const cardCvcInput = document.getElementById('card-cvc-input');
     
-    const cardExpiryElement = elements.create('cardExpiry', {
-        style: {
-            base: {
-                fontSize: '16px',
-                color: '#ffffff',
-                fontFamily: 'Arial, sans-serif',
-                lineHeight: '16px',
-                '::placeholder': {
-                    color: '#9ca3af',
-                }
-            },
-            invalid: {
-                color: '#ef4444',
-            }
-        }
-    });
+    // Format card number input
+    function formatCardNumber(value) {
+        return value.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
+    }
     
-    const cardCvcElement = elements.create('cardCvc', {
-        style: {
-            base: {
-                fontSize: '16px',
-                color: '#ffffff',
-                fontFamily: 'Arial, sans-serif',
-                lineHeight: '16px',
-                '::placeholder': {
-                    color: '#9ca3af',
-                }
-            },
-            invalid: {
-                color: '#ef4444',
-            }
-        }
-    });
+    // Format expiry input
+    function formatExpiry(value) {
+        return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2');
+    }
+    
+    // Format CVC input
+    function formatCVC(value) {
+        return value.replace(/\D/g, '');
+    }
+    
+    // Add input formatting
+    if (cardNumberInput) {
+        cardNumberInput.addEventListener('input', function(e) {
+            e.target.value = formatCardNumber(e.target.value);
+        });
+    }
+    
+    if (cardExpiryInput) {
+        cardExpiryInput.addEventListener('input', function(e) {
+            e.target.value = formatExpiry(e.target.value);
+        });
+    }
+    
+    if (cardCvcInput) {
+        cardCvcInput.addEventListener('input', function(e) {
+            e.target.value = formatCVC(e.target.value);
+        });
+    }
     
     let cardMounted = false;
     const cardSection = document.getElementById('card-section');
@@ -277,23 +267,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 cardSection.classList.remove('hidden');
                 console.log('✅ Card section shown, classList:', cardSection.classList.toString());
                 
-                // Mount separate Stripe elements only once
+                // Focus the simple HTML input - NO MOUNTING NEEDED
                 if (!cardMounted) {
-                    try {
-                        cardNumberElement.mount('#card-number-element');
-                        cardExpiryElement.mount('#card-expiry-element');
-                        cardCvcElement.mount('#card-cvc-element');
-                        cardMounted = true;
-                        console.log('✅ Separate Stripe card elements mounted successfully');
-                        
-                        // Focus the card number field
-                        setTimeout(() => {
-                            cardNumberElement.focus();
-                            console.log('🎯 Focused card number element');
-                        }, 300);
-                    } catch (error) {
-                        console.error('❌ Error mounting Stripe elements:', error);
-                    }
+                    cardMounted = true;
+                    console.log('✅ Simple HTML inputs ready - NO STRIPE ELEMENTS');
+                    
+                    // Focus the card number input
+                    setTimeout(() => {
+                        if (cardNumberInput) {
+                            cardNumberInput.focus();
+                            console.log('🎯 Focused card number input');
+                        }
+                    }, 100);
                 }
             }
         } else {
@@ -319,31 +304,28 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleCardSection();
     }, 100);
     
-    // Handle card validation for separate elements
-    function handleCardError(event) {
-        const displayError = document.getElementById('card-errors');
-        if (event.error) {
-            displayError.textContent = event.error.message;
-        } else {
-            displayError.textContent = '';
+    // Simple validation for HTML inputs
+    function validateCardInputs() {
+        const cardNumber = cardNumberInput ? cardNumberInput.value.replace(/\s/g, '') : '';
+        const cardExpiry = cardExpiryInput ? cardExpiryInput.value : '';
+        const cardCvc = cardCvcInput ? cardCvcInput.value : '';
+        
+        if (!cardNumber || cardNumber.length < 13) {
+            return 'Please enter a valid card number';
         }
+        
+        if (!cardExpiry || !cardExpiry.includes('/')) {
+            return 'Please enter expiry date (MM/YY)';
+        }
+        
+        if (!cardCvc || cardCvc.length < 3) {
+            return 'Please enter CVC';
+        }
+        
+        return null;
     }
     
-    cardNumberElement.on('change', handleCardError);
-    cardExpiryElement.on('change', handleCardError);
-    cardCvcElement.on('change', handleCardError);
-    
-    cardNumberElement.on('ready', function() {
-        console.log('✅ Card number element is ready for input!');
-    });
-    
-    cardExpiryElement.on('ready', function() {
-        console.log('✅ Card expiry element is ready!');
-    });
-    
-    cardCvcElement.on('ready', function() {
-        console.log('✅ Card CVC element is ready!');
-    });
+    console.log('✅ Simple HTML card inputs ready - NO GRAY BARS!');
     
     // Handle form submission
     const form = document.querySelector('form');
@@ -367,9 +349,28 @@ document.addEventListener('DOMContentLoaded', function() {
             submitButton.innerHTML = '<span>Processing Payment...</span>';
             
             try {
+                // Validate inputs first
+                const validationError = validateCardInputs();
+                if (validationError) {
+                    document.getElementById('card-errors').textContent = validationError;
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                    return;
+                }
+                
+                // Get card data from HTML inputs
+                const cardNumber = cardNumberInput.value.replace(/\s/g, '');
+                const cardExpiry = cardExpiryInput.value.split('/');
+                const cardCvc = cardCvcInput.value;
+                
                 const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
                     type: 'card',
-                    card: cardNumberElement,
+                    card: {
+                        number: cardNumber,
+                        exp_month: parseInt(cardExpiry[0]),
+                        exp_year: parseInt('20' + cardExpiry[1]),
+                        cvc: cardCvc,
+                    },
                     billing_details: {
                         name: document.querySelector('input[wire\\:model="recipient_name"]').value,
                     }
