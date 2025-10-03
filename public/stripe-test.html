@@ -14,10 +14,16 @@
             border-radius: 4px; 
             min-height: 40px;
             cursor: text;
+            display: flex;
+            align-items: center;
         }
         #card-element:focus-within {
             border-color: #007cba;
             box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.2);
+        }
+        #card-element .StripeElement {
+            width: 100%;
+            padding: 0;
         }
         .error { color: red; margin-top: 10px; }
         .success { color: green; margin-top: 10px; }
@@ -44,7 +50,24 @@
     <div id="card-section" class="card-container hidden">
         <h3>Card Details</h3>
         <p>Use test card: 4242 4242 4242 4242</p>
-        <div id="card-element"></div>
+        
+        <!-- Try separate card fields -->
+        <div style="margin-bottom: 15px;">
+            <label>Card Number</label>
+            <div id="card-number-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; min-height: 40px;"></div>
+        </div>
+        
+        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+            <div style="flex: 1;">
+                <label>Expiry</label>
+                <div id="card-expiry-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; min-height: 40px;"></div>
+            </div>
+            <div style="flex: 1;">
+                <label>CVC</label>
+                <div id="card-cvc-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; min-height: 40px;"></div>
+            </div>
+        </div>
+        
         <div id="card-errors" class="error"></div>
     </div>
     
@@ -84,25 +107,41 @@
                 const elements = stripe.elements();
                 log('✅ Stripe elements created');
                 
-                // Create card element
-                const cardElement = elements.create('card', {
+                // Create separate card elements
+                const cardNumberElement = elements.create('cardNumber', {
                     style: {
                         base: {
                             fontSize: '16px',
                             color: '#424770',
-                            fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-                            fontSmoothing: 'antialiased',
-                            '::placeholder': {
-                                color: '#aab7c4',
-                            },
-                        },
-                        invalid: {
-                            color: '#9e2146',
-                        },
-                    },
-                    hidePostalCode: true
+                            fontFamily: 'Arial, sans-serif',
+                            '::placeholder': { color: '#aab7c4' }
+                        }
+                    }
                 });
-                log('✅ Card element created');
+                
+                const cardExpiryElement = elements.create('cardExpiry', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#424770',
+                            fontFamily: 'Arial, sans-serif',
+                            '::placeholder': { color: '#aab7c4' }
+                        }
+                    }
+                });
+                
+                const cardCvcElement = elements.create('cardCvc', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#424770',
+                            fontFamily: 'Arial, sans-serif',
+                            '::placeholder': { color: '#aab7c4' }
+                        }
+                    }
+                });
+                
+                log('✅ Separate card elements created');
                 
                 let cardMounted = false;
                 const cardSection = document.getElementById('card-section');
@@ -118,22 +157,19 @@
                         
                         if (!cardMounted) {
                             try {
-                                cardElement.mount('#card-element');
+                                cardNumberElement.mount('#card-number-element');
+                                cardExpiryElement.mount('#card-expiry-element');
+                                cardCvcElement.mount('#card-cvc-element');
                                 cardMounted = true;
-                                log('✅ Card element mounted successfully', 'success');
+                                log('✅ Separate card elements mounted successfully', 'success');
                                 
-                                // Force focus after a longer delay
+                                // Focus the card number field
                                 setTimeout(() => {
-                                    cardElement.focus();
-                                    log('🎯 Focused card element');
-                                    
-                                    // Click the card element container to ensure it's interactive
-                                    const cardContainer = document.getElementById('card-element');
-                                    cardContainer.click();
-                                    log('👆 Clicked card container');
-                                }, 500);
+                                    cardNumberElement.focus();
+                                    log('🎯 Focused card number element');
+                                }, 300);
                             } catch (error) {
-                                log('❌ Error mounting card element: ' + error.message, 'error');
+                                log('❌ Error mounting card elements: ' + error.message, 'error');
                             }
                         }
                     } else {
@@ -148,21 +184,31 @@
                 });
                 
                 // Card events
-                cardElement.on('ready', function() {
-                    log('🎉 Card element is ready for input!', 'success');
+                cardNumberElement.on('ready', function() {
+                    log('🎉 Card number element is ready for input!', 'success');
                 });
                 
-                cardElement.on('change', function(event) {
+                cardExpiryElement.on('ready', function() {
+                    log('🎉 Card expiry element is ready!', 'success');
+                });
+                
+                cardCvcElement.on('ready', function() {
+                    log('🎉 Card CVC element is ready!', 'success');
+                });
+                
+                // Handle validation errors
+                function handleCardError(event) {
                     if (event.error) {
                         document.getElementById('card-errors').textContent = event.error.message;
                         log('Card validation error: ' + event.error.message, 'error');
                     } else {
                         document.getElementById('card-errors').textContent = '';
-                        if (event.complete) {
-                            log('✅ Card details are complete and valid', 'success');
-                        }
                     }
-                });
+                }
+                
+                cardNumberElement.on('change', handleCardError);
+                cardExpiryElement.on('change', handleCardError);
+                cardCvcElement.on('change', handleCardError);
                 
                 // Test button
                 document.getElementById('test-btn').addEventListener('click', async function() {
@@ -183,7 +229,7 @@
                     try {
                         const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
                             type: 'card',
-                            card: cardElement,
+                            card: cardNumberElement,
                         });
                         
                         if (error) {
