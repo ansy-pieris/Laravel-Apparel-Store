@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Stripe Test - NO GRAY BARS</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .card-container { background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .error { color: red; margin-top: 10px; }
+        .success { color: green; margin-top: 10px; }
+        .payment-methods { margin: 20px 0; }
+        .payment-methods label { display: block; margin: 10px 0; }
+        #card-section { margin-top: 20px; }
+        .hidden { display: none; }
+        
+        /* Simple input styling */
+        .card-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #007cba;
+            border-radius: 6px;
+            font-size: 18px;
+            background: white;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        .card-input:focus {
+            outline: none;
+            border-color: #0056b3;
+            box-shadow: 0 0 0 3px rgba(0, 123, 186, 0.2);
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .col {
+            flex: 1;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Stripe Test - NO GRAY BARS</h1>
+    <div id="console-output"></div>
+    
+    <div class="payment-methods">
+        <h3>Payment Method:</h3>
+        <label>
+            <input type="radio" name="payment_method" value="cod" checked> Cash on Delivery
+        </label>
+        <label>
+            <input type="radio" name="payment_method" value="card"> Card Payment
+        </label>
+    </div>
+    
+    <div id="card-section" class="card-container hidden">
+        <h3>Card Details</h3>
+        <p>Use test card: 4242 4242 4242 4242</p>
+        
+        <!-- Simple HTML inputs - NO STRIPE ELEMENTS -->
+        <div>
+            <label>Card Number</label>
+            <input type="text" id="card-number" class="card-input" placeholder="1234 5678 9012 3456" maxlength="19">
+        </div>
+        
+        <div class="row">
+            <div class="col">
+                <label>Expiry</label>
+                <input type="text" id="card-expiry" class="card-input" placeholder="MM/YY" maxlength="5">
+            </div>
+            <div class="col">
+                <label>CVC</label>
+                <input type="text" id="card-cvc" class="card-input" placeholder="123" maxlength="4">
+            </div>
+        </div>
+        
+        <div id="card-errors" class="error"></div>
+    </div>
+    
+    <button id="test-btn" style="margin-top: 20px; padding: 12px 24px; background: #007cba; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer;">
+        Test Payment
+    </button>
+    
+    <div id="results"></div>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        // Console logging function
+        function log(message, type = 'info') {
+            console.log(message);
+            const output = document.getElementById('console-output');
+            const div = document.createElement('div');
+            div.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            output.appendChild(div);
+        }
+        
+        // Format card number input
+        function formatCardNumber(value) {
+            return value.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
+        }
+        
+        // Format expiry input
+        function formatExpiry(value) {
+            return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2');
+        }
+        
+        // Format CVC input
+        function formatCVC(value) {
+            return value.replace(/\D/g, '');
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 DOM loaded, starting SIMPLE stripe test...');
+            
+            // Check if Stripe is loaded
+            if (typeof Stripe === 'undefined') {
+                log('❌ Stripe is not loaded! Check CSP settings.', 'error');
+                document.getElementById('card-errors').textContent = 'Stripe not loaded - CSP issue';
+                return;
+            }
+            
+            log('✅ Stripe is available');
+            
+            try {
+                // Initialize Stripe with test key
+                const stripe = Stripe('pk_test_51S0gYfKyfRZGi0cj0Q2x7dEWuN4totRdghbjZQa8bzIA7mPjSeD6aAYgjbHOwahhhXhgKAFHT3tbukYLzCP8IwPq00kpxq5pIK');
+                log('✅ Stripe initialized');
+                
+                const cardSection = document.getElementById('card-section');
+                const cardNumberInput = document.getElementById('card-number');
+                const cardExpiryInput = document.getElementById('card-expiry');
+                const cardCvcInput = document.getElementById('card-cvc');
+                
+                // Add input formatting
+                cardNumberInput.addEventListener('input', function(e) {
+                    e.target.value = formatCardNumber(e.target.value);
+                });
+                
+                cardExpiryInput.addEventListener('input', function(e) {
+                    e.target.value = formatExpiry(e.target.value);
+                });
+                
+                cardCvcInput.addEventListener('input', function(e) {
+                    e.target.value = formatCVC(e.target.value);
+                });
+                
+                // Payment method toggle
+                function toggleCardSection() {
+                    const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+                    log('Payment method selected: ' + paymentMethod);
+                    
+                    if (paymentMethod === 'card') {
+                        cardSection.classList.remove('hidden');
+                        log('✅ Card section shown');
+                        setTimeout(() => {
+                            cardNumberInput.focus();
+                            log('🎯 Focused card number input');
+                        }, 100);
+                    } else {
+                        cardSection.classList.add('hidden');
+                        log('Card section hidden');
+                    }
+                }
+                
+                // Listen to radio button changes
+                document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+                    radio.addEventListener('change', toggleCardSection);
+                });
+                
+                // Test button
+                document.getElementById('test-btn').addEventListener('click', async function() {
+                    const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+                    
+                    if (paymentMethod !== 'card') {
+                        log('COD selected - no card processing needed');
+                        return;
+                    }
+                    
+                    const cardNumber = cardNumberInput.value.replace(/\s/g, '');
+                    const cardExpiry = cardExpiryInput.value.split('/');
+                    const cardCvc = cardCvcInput.value;
+                    
+                    if (!cardNumber || !cardExpiry[0] || !cardExpiry[1] || !cardCvc) {
+                        log('❌ Please fill all card fields', 'error');
+                        return;
+                    }
+                    
+                    log('Testing payment method creation with simple inputs...');
+                    
+                    try {
+                        const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
+                            type: 'card',
+                            card: {
+                                number: cardNumber,
+                                exp_month: parseInt(cardExpiry[0]),
+                                exp_year: parseInt('20' + cardExpiry[1]),
+                                cvc: cardCvc,
+                            },
+                        });
+                        
+                        if (error) {
+                            log('❌ Payment method error: ' + error.message, 'error');
+                            document.getElementById('card-errors').textContent = error.message;
+                        } else {
+                            log('✅ Payment method created: ' + stripePaymentMethod.id, 'success');
+                            document.getElementById('results').innerHTML = '<div style="color: green; font-weight: bold; padding: 10px; background: #d4edda; border-radius: 4px;">SUCCESS! Payment method: ' + stripePaymentMethod.id + '</div>';
+                            document.getElementById('card-errors').textContent = '';
+                        }
+                    } catch (err) {
+                        log('❌ Exception: ' + err.message, 'error');
+                        document.getElementById('card-errors').textContent = 'Payment failed: ' + err.message;
+                    }
+                });
+                
+                log('🎉 Simple setup complete - NO STRIPE ELEMENTS!');
+                
+            } catch (error) {
+                log('❌ Setup error: ' + error.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
