@@ -8,7 +8,7 @@
             </div>
         @endif
 
-        <form wire:submit="placeOrder" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <form class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <!-- Shipping Form -->
             <div class="space-y-4 bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-lg">
                 <h2 class="text-xl font-semibold mb-4">Shipping Details</h2>
@@ -57,109 +57,36 @@
                     <label class="block mb-1 font-semibold">Postal Code*</label>
                     <input type="text" wire:model="postal_code" required 
                            class="w-full p-2 bg-gray-800 text-white rounded border @error('postal_code') border-red-500 @else border-gray-600 @enderror" 
-                           placeholder="00000">
+                           placeholder="10000">
                     @error('postal_code')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
                 </div>
-            </div>
 
-            <!-- Order Summary -->
-            <div class="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-lg">
-                <h2 class="text-xl font-semibold mb-4">Your Order</h2>
-                
-                @if($items->count() > 0)
-                    <table class="w-full text-left mb-6">
-                        <thead>
-                            <tr class="text-gray-300">
-                                <th class="pb-2">Product</th>
-                                <th class="pb-2">Quantity</th>
-                                <th class="pb-2">Price</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($items as $item)
-                                <tr class="border-b border-gray-700">
-                                    <td class="py-2 flex items-center space-x-3">
-                                        @if($item->product && $item->product->image)
-                                            <img src="{{ $item->product->image_url }}" 
-                                                 class="w-12 h-12 object-cover rounded" 
-                                                 alt="{{ $item->product->name }}">
-                                        @else
-                                            <div class="w-12 h-12 bg-gray-600 rounded flex items-center justify-center">
-                                                <span class="text-xs text-gray-300">No Image</span>
-                                            </div>
-                                        @endif
-                                        <span>{{ $item->product->name }}</span>
-                                    </td>
-                                    <td class="py-2">x{{ $item->quantity }}</td>
-                                    <td class="py-2">Rs. {{ number_format($item->product->price, 2) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-
-                    <div class="border-t border-gray-600 pt-4 text-sm space-y-1">
-                        <div class="flex justify-between">
-                            <span>Subtotal:</span>
-                            <span>Rs. {{ number_format($subtotal, 2) }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span>Shipping:</span>
-                            <span>Free</span>
-                        </div>
-                        @if($tax > 0)
-                            <div class="flex justify-between">
-                                <span>Tax:</span>
-                                <span>Rs. {{ number_format($tax, 2) }}</span>
-                            </div>
-                        @endif
-                        <div class="flex justify-between font-semibold">
-                            <span>Total:</span>
-                            <span>Rs. {{ number_format($total, 2) }}</span>
-                        </div>
-                    </div>
-
-                    <!-- Payment Method -->
-                    <div class="mt-6 space-y-2">
-                        <label class="block font-semibold mb-1">Payment Method</label>
+                <!-- Payment Method Selection -->
+                <div class="space-y-3 pt-4">
+                    <h3 class="text-lg font-semibold">Payment Method</h3>
+                    
+                    <div class="space-y-2">
                         <label class="flex items-center space-x-2">
-                            <input type="radio" name="payment_method" value="cod" class="accent-white" checked>
+                            <input type="radio" name="payment_method" value="cod" wire:model="payment_method" class="accent-white">
                             <span>Cash on Delivery</span>
                         </label>
+
                         <label class="flex items-center space-x-2">
-                            <input type="radio" name="payment_method" value="card" class="accent-white">
+                            <input type="radio" name="payment_method" value="card" wire:model="payment_method" class="accent-white">
                             <span>Card Payment</span>
                         </label>
 
-                        <!-- Simple Card Details Section - NO STRIPE ELEMENTS -->
+                        <!-- Stripe Card Elements Section -->
                         <div wire:ignore class="space-y-4 mt-4 hidden" id="card-section">
                             <label class="block font-semibold">Card Details*</label>
                             <p class="text-sm text-gray-400">Use test card: 4242 4242 4242 4242</p>
                             
-                            <!-- Simple HTML Inputs -->
+                            <!-- Stripe Card Element Container -->
                             <div>
-                                <label class="block text-sm font-medium mb-1 text-white">Card Number</label>
-                                <input type="text" id="card-number-input" 
-                                       class="w-full p-3 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" 
-                                       placeholder="1234 5678 9012 3456" 
-                                       maxlength="19">
-                            </div>
-                            
-                            <div class="flex space-x-4">
-                                <div class="flex-1">
-                                    <label class="block text-sm font-medium mb-1 text-white">Expiry</label>
-                                    <input type="text" id="card-expiry-input" 
-                                           class="w-full p-3 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" 
-                                           placeholder="MM/YY" 
-                                           maxlength="5">
-                                </div>
-                                <div class="flex-1">
-                                    <label class="block text-sm font-medium mb-1 text-white">CVC</label>
-                                    <input type="text" id="card-cvc-input" 
-                                           class="w-full p-3 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" 
-                                           placeholder="123" 
-                                           maxlength="4">
+                                <div id="card-element" class="w-full p-3 bg-gray-800 border border-gray-600 rounded focus-within:border-blue-500">
+                                    <!-- Stripe Elements will create form elements here -->
                                 </div>
                             </div>
                             
@@ -171,9 +98,44 @@
                             @enderror
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Order Summary -->
+            <div class="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-lg">
+                @if($itemCount > 0)
+                    <h2 class="text-xl font-semibold mb-4">Order Summary</h2>
+                    
+                    <div class="space-y-3 mb-4">
+                        @foreach($items as $item)
+                            <div class="flex justify-between items-center">
+                                <div class="flex-1">
+                                    <p class="font-medium">{{ $item->product->name }}</p>
+                                    <p class="text-sm text-gray-400">Size: {{ $item->size }} | Qty: {{ $item->quantity }}</p>
+                                </div>
+                                <p class="font-medium">Rs {{ number_format($item->product->price * $item->quantity, 2) }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="border-t border-gray-600 pt-4 space-y-2">
+                        <div class="flex justify-between">
+                            <span>Subtotal:</span>
+                            <span>Rs {{ number_format($subtotal, 2) }}</span>
+                        </div>
+                        @if($tax > 0)
+                            <div class="flex justify-between">
+                                <span>Tax:</span>
+                                <span>Rs {{ number_format($tax, 2) }}</span>
+                            </div>
+                        @endif
+                        <div class="flex justify-between font-bold text-lg">
+                            <span>Total:</span>
+                            <span>Rs {{ number_format($total, 2) }}</span>
+                        </div>
+                    </div>
 
                     <button type="submit" 
-                            id="place-order-btn"
                             class="mt-6 w-full bg-red-600 text-white py-2 rounded text-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
                             wire:loading.attr="disabled">
                         <span wire:loading.remove>Place Order</span>
@@ -194,104 +156,64 @@
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
-// EMERGENCY DEBUGGING - RUN IMMEDIATELY
-console.log('🔍 SCRIPT STARTED - Checking basic elements...');
-console.log('Card number input exists:', !!document.getElementById('card-number-input'));
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM loaded, initializing checkout...');
-    
-    // Check if Stripe is loaded
-    if (typeof Stripe === 'undefined') {
-        console.error('❌ Stripe is not loaded! Check CSP settings.');
-        const errorElement = document.getElementById('card-errors');
-        if (errorElement) {
-            errorElement.textContent = 'Payment system unavailable. Please refresh the page.';
-        }
-        return;
-    }
-    
-    console.log('✅ Stripe is available, initializing...');
     // Initialize Stripe
     const stripe = Stripe('{{ config('services.stripe.key') }}');
     const elements = stripe.elements();
     
-    // Get the simple HTML input elements - NO STRIPE ELEMENTS
-    const cardNumberInput = document.getElementById('card-number-input');
-    const cardExpiryInput = document.getElementById('card-expiry-input');
-    const cardCvcInput = document.getElementById('card-cvc-input');
-    
-    // Format card number input
-    function formatCardNumber(value) {
-        return value.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
-    }
-    
-    // Format expiry input
-    function formatExpiry(value) {
-        return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2');
-    }
-    
-    // Format CVC input
-    function formatCVC(value) {
-        return value.replace(/\D/g, '');
-    }
-    
-    // Add input formatting
-    if (cardNumberInput) {
-        cardNumberInput.addEventListener('input', function(e) {
-            e.target.value = formatCardNumber(e.target.value);
-        });
-    }
-    
-    if (cardExpiryInput) {
-        cardExpiryInput.addEventListener('input', function(e) {
-            e.target.value = formatExpiry(e.target.value);
-        });
-    }
-    
-    if (cardCvcInput) {
-        cardCvcInput.addEventListener('input', function(e) {
-            e.target.value = formatCVC(e.target.value);
-        });
-    }
-    
+    // Create card element with custom styling
+    const cardElement = elements.create('card', {
+        style: {
+            base: {
+                fontSize: '16px',
+                color: '#ffffff',
+                '::placeholder': {
+                    color: '#9ca3af',
+                },
+                backgroundColor: 'transparent',
+            },
+            invalid: {
+                color: '#ef4444',
+            },
+        },
+    });
+
     let cardMounted = false;
     const cardSection = document.getElementById('card-section');
+    
+    // Handle card element errors
+    cardElement.on('change', function(event) {
+        const displayError = document.getElementById('card-errors');
+        if (event.error) {
+            displayError.textContent = event.error.message;
+        } else {
+            displayError.textContent = '';
+        }
+    });
     
     // Function to show/hide card section and mount Stripe element
     function toggleCardSection() {
         const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
-        console.log('Payment method selected:', paymentMethod);
         
         // Update Livewire property
         @this.set('payment_method', paymentMethod);
         
         if (paymentMethod === 'card') {
             // Show card section
-            console.log('🎯 CARD PAYMENT SELECTED!');
-            
             if (cardSection) {
                 cardSection.classList.remove('hidden');
-                console.log('✅ Card section shown');
                 
-                // Focus the simple HTML input - NO MOUNTING NEEDED
+                // Mount card element if not already mounted
                 if (!cardMounted) {
+                    cardElement.mount('#card-element');
                     cardMounted = true;
-                    console.log('✅ Simple HTML inputs ready - NO STRIPE ELEMENTS');
-                    
-                    // Focus the card number input
-                    setTimeout(() => {
-                        if (cardNumberInput) {
-                            cardNumberInput.focus();
-                            console.log('🎯 Focused card number input');
-                        }
-                    }, 100);
+                    console.log('✅ Stripe card element mounted');
                 }
             }
         } else {
             // Hide card section
             if (cardSection) {
                 cardSection.classList.add('hidden');
-                console.log('✅ Card section hidden, classList:', cardSection.classList.toString());
             }
         }
     }
@@ -299,211 +221,91 @@ document.addEventListener('DOMContentLoaded', function() {
     // Listen to payment method changes
     document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            console.log('Radio button changed to:', this.value);
             toggleCardSection();
         });
     });
     
     // Initial toggle based on current selection
     setTimeout(function() {
-        console.log('Running initial toggle...');
         toggleCardSection();
     }, 100);
     
-    // Enhanced validation for HTML inputs
-    function validateCardInputs() {
-        const cardNumber = cardNumberInput ? cardNumberInput.value.replace(/\s/g, '') : '';
-        const cardExpiry = cardExpiryInput ? cardExpiryInput.value : '';
-        const cardCvc = cardCvcInput ? cardCvcInput.value : '';
-        
-        console.log('🔍 Validating:', { cardNumber: cardNumber.substring(0, 4) + '****', cardExpiry, cardCvc });
-        
-        if (!cardNumber || cardNumber.length < 13 || cardNumber.length > 19) {
-            return 'Card number must be 13-19 digits';
-        }
-        
-        if (!/^\d+$/.test(cardNumber)) {
-            return 'Card number must contain only numbers';
-        }
-        
-        if (!cardExpiry || !cardExpiry.includes('/')) {
-            return 'Please enter expiry date (MM/YY)';
-        }
-        
-        const [month, year] = cardExpiry.split('/');
-        if (!month || !year || month.length !== 2 || year.length !== 2) {
-            return 'Invalid expiry format (use MM/YY)';
-        }
-        
-        const monthNum = parseInt(month);
-        const yearNum = parseInt('20' + year);
-        if (monthNum < 1 || monthNum > 12) {
-            return 'Invalid month (01-12)';
-        }
-        
-        const currentYear = new Date().getFullYear();
-        if (yearNum < currentYear || yearNum > currentYear + 20) {
-            return 'Invalid expiry year';
-        }
-        
-        if (!cardCvc || cardCvc.length < 3 || cardCvc.length > 4) {
-            return 'CVC must be 3-4 digits';
-        }
-        
-        if (!/^\d+$/.test(cardCvc)) {
-            return 'CVC must contain only numbers';
-        }
-        
-        console.log('✅ Card validation passed');
-        return null;
-    }
-    
-    // Real-time validation feedback
-    function showValidationFeedback() {
-        const errorDiv = document.getElementById('card-errors');
-        const validationError = validateCardInputs();
-        
-        if (validationError) {
-            errorDiv.textContent = validationError;
-            errorDiv.style.color = '#ef4444';
-        } else {
-            errorDiv.textContent = '✅ Card details look good';
-            errorDiv.style.color = '#10b981';
-        }
-    }
-    
-    // Add real-time validation
-    if (cardNumberInput) {
-        cardNumberInput.addEventListener('blur', showValidationFeedback);
-    }
-    if (cardExpiryInput) {
-        cardExpiryInput.addEventListener('blur', showValidationFeedback);
-    }
-    if (cardCvcInput) {
-        cardCvcInput.addEventListener('blur', showValidationFeedback);
-    }
-    
-    console.log('✅ Enhanced validation ready!');
-    
-
-    
-    // Handle form submission - SIMPLIFIED VERSION
+    // Handle form submission with PaymentIntent flow
     const form = document.querySelector('form');
     if (form) {
-        console.log('✅ Form submission handler attached');
-        
         form.addEventListener('submit', async function(event) {
-            console.log('📝 Form submit event triggered');
-            const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
-            console.log('Form submission - payment method:', paymentMethod);
-            
-            // Always prevent default to handle properly
             event.preventDefault();
             
+            const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
             const submitButton = form.querySelector('button[type="submit"]');
             const originalText = submitButton.innerHTML;
+            
             submitButton.disabled = true;
             submitButton.innerHTML = '<span>Processing...</span>';
             
             try {
-                // Update Livewire property first
+                // Update Livewire property
                 await @this.set('payment_method', paymentMethod);
-                console.log('✅ Payment method set in Livewire:', paymentMethod);
                 
                 if (paymentMethod === 'cod') {
-                    console.log('🚚 COD order - calling Livewire directly');
-                    // For COD, just call the placeOrder method
-                    const result = await @this.placeOrder();
-                    console.log('✅ COD order placed successfully:', result);
+                    // Handle COD normally
+                    await @this.placeOrder();
                     return;
                 }
                 
                 if (paymentMethod === 'card') {
-                    console.log('� Card payment - processing with Stripe');
+                    // Step 1: Create PaymentIntent on server
+                    const intentResult = await @this.createPaymentIntent();
                     
-                    // Validate inputs first
-                    const validationError = validateCardInputs();
-                    if (validationError) {
-                        console.log('❌ Validation failed:', validationError);
-                        document.getElementById('card-errors').textContent = validationError;
-                        throw new Error(validationError);
+                    if (!intentResult.success) {
+                        throw new Error(intentResult.message);
                     }
                     
-                    // Get card data from HTML inputs
-                    const cardNumber = cardNumberInput.value.replace(/\s/g, '');
-                    const cardExpiry = cardExpiryInput.value.split('/');
-                    const cardCvc = cardCvcInput.value;
-                    const recipientName = document.querySelector('input[wire\\:model="recipient_name"]')?.value || 'Customer';
-                    
-                    console.log('💳 Creating payment method with Stripe...');
-                    
-                    const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
-                        type: 'card',
-                        card: {
-                            number: cardNumber,
-                            exp_month: parseInt(cardExpiry[0]),
-                            exp_year: parseInt('20' + cardExpiry[1]),
-                            cvc: cardCvc,
-                        },
-                        billing_details: {
-                            name: recipientName,
+                    // Step 2: Confirm payment with Stripe
+                    const {error, paymentIntent} = await stripe.confirmCardPayment(
+                        intentResult.client_secret,
+                        {
+                            payment_method: {
+                                card: cardElement,
+                                billing_details: {
+                                    name: document.querySelector('input[wire\\:model="recipient_name"]')?.value || 'Customer',
+                                }
+                            }
                         }
-                    });
+                    );
                     
                     if (error) {
-                        console.log('❌ Stripe error:', error);
-                        document.getElementById('card-errors').textContent = error.message;
                         throw new Error(error.message);
                     }
                     
-                    if (!stripePaymentMethod?.id) {
-                        throw new Error('Failed to create payment method');
-                    }
-                    
-                    console.log('✅ Payment method created, calling Livewire...');
-                    
-                    // Send to Livewire backend
-                    const result = await @this.processStripePayment(stripePaymentMethod.id);
-                    console.log('✅ Stripe payment result:', result);
-                    
-                    if (result && result.success) {
-                        console.log('🎉 Payment successful!');
-                        document.getElementById('card-errors').innerHTML = '<span style="color: #10b981;">✅ ' + result.message + '</span>';
+                    if (paymentIntent.status === 'succeeded') {
+                        // Step 3: Place order after successful payment
+                        const orderResult = await @this.placeOrderAfterPayment(paymentIntent.id);
                         
-                        // Redirect if provided
-                        if (result.redirect) {
-                            setTimeout(() => {
-                                window.location.href = result.redirect;
-                            }, 1500);
+                        if (orderResult.success) {
+                            document.getElementById('card-errors').innerHTML = 
+                                '<span style="color: #10b981;">✅ ' + orderResult.message + '</span>';
+                            
+                            if (orderResult.redirect) {
+                                setTimeout(() => {
+                                    window.location.href = orderResult.redirect;
+                                }, 2000);
+                            }
+                        } else {
+                            throw new Error(orderResult.message);
                         }
-                        return;
-                    } else {
-                        throw new Error(result?.message || 'Payment processing failed');
                     }
                 }
                 
             } catch (err) {
-                console.error('❌ Payment processing error:', err);
-                const errorMessage = err.message || 'Payment failed. Please try again.';
-                document.getElementById('card-errors').textContent = errorMessage;
+                document.getElementById('card-errors').textContent = err.message;
             } finally {
-                // Re-enable button
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalText;
             }
         });
-    } else {
-        console.log('❌ Form not found!');
     }
     
-    console.log('🎉 Setup complete - both payment methods should work now!');
-});
-
-// Listen for Livewire events
-window.addEventListener('orderCompleted', function() {
-    console.log('🎉 Order completed event received');
-    setTimeout(() => {
-        window.location.href = '/';
-    }, 2000);
+    console.log('✅ Stripe checkout initialized');
 });
 </script>

@@ -98,83 +98,102 @@ class CheckoutPage extends Component
         $this->total = $this->subtotal + $this->tax;
     }
 
-    public function processStripePayment($paymentMethodId)
+    public function createPaymentIntent()
     {
         try {
-            \Log::info('ProcessStripePayment called', [
-                'payment_method_id' => $paymentMethodId,
-                'total' => $this->total,
-                'user_id' => Auth::id()
-            ]);
-            
             // Validate form first
-            try {
-                $this->validate();
-                \Log::info('Form validation passed');
-            } catch (\Exception $validationError) {
-                \Log::error('Form validation failed: ' . $validationError->getMessage());
-                throw $validationError;
+            $this->validate();
+            
+            if ($this->itemCount == 0) {
+                throw new \Exception('Your cart is empty.');
             }
             
             // Set Stripe API key
             Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
-            \Log::info('Stripe API key set');
-            
-            // Store payment method ID
-            $this->stripe_payment_method_id = $paymentMethodId;
-            \Log::info('Payment method ID stored: ' . $paymentMethodId);
             
             // Create payment intent
             $paymentIntent = PaymentIntent::create([
                 'amount' => round($this->total * 100), // Convert to cents
                 'currency' => 'lkr', // Sri Lankan Rupees
-                'payment_method' => $paymentMethodId,
-                'confirmation_method' => 'manual',
-                'confirm' => true,
-                'return_url' => route('home'),
+                'automatic_payment_methods' => [
+                    'enabled' => true,
+                ],
                 'metadata' => [
                     'user_id' => Auth::id(),
                     'user_email' => Auth::user()->email,
                     'order_total' => $this->total,
+                    'recipient_name' => $this->recipient_name,
+                    'phone' => $this->phone,
+                    'address' => $this->address,
+                    'city' => $this->city,
+                    'postal_code' => $this->postal_code,
                 ]
             ]);
             
-            // Store payment intent ID
+            // Store payment intent ID for later use
             $this->stripe_payment_intent_id = $paymentIntent->id;
             
-            if ($paymentIntent->status === 'requires_action') {
-                // 3D Secure authentication required
-                \Log::info('Payment requires 3D Secure authentication');
-                $this->dispatch('confirmPayment', [
-                    'client_secret' => $paymentIntent->client_secret
+            \Log::info('PaymentIntent created', [
+                'payment_intent_id' => $paymentIntent->id,
+                'amount' => $paymentIntent->amount,
+                'user_id' => Auth::id()
+            ]);
+            
+            return [
+                'success' => true,
+                'client_secret' => $paymentIntent->client_secret
+            ];
+            
+        } catch (\Exception $e) {
+            \Log::error('PaymentIntent creation failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    public function placeOrderAfterPayment($paymentIntentId)
+    {
+        try {
+            // Verify the payment was successful
+            Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
+            $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
+            
+            if ($paymentIntent->status !== 'succeeded') {
+                throw new \Exception('Payment was not successful');
+            }
+            
+            // Store the payment intent ID
+            $this->stripe_payment_intent_id = $paymentIntentId;
+            
+            // Create the order (similar to COD but with payment info)
+            $orderResult = $this->createOrder();
+            
+            if ($orderResult) {
+                \Log::info('Order created successfully after Stripe payment', [
+                    'payment_intent_id' => $paymentIntentId,
+                    'user_id' => Auth::id()
                 ]);
-                return ['success' => false, 'message' => '3D Secure authentication required', 'requires_action' => true];
-            } else if ($paymentIntent->status === 'succeeded') {
-                // Payment succeeded immediately
-                \Log::info('Payment succeeded, completing order');
-                $orderResult = $this->completeOrder();
-                if ($orderResult) {
-                    // Flash success message for redirect
-                    $deliveryDate = now()->addDays(4)->format('M j, Y');
-                    session()->flash('order_success', "Thank you for your purchase! Your payment has been processed successfully. Order will be delivered by {$deliveryDate}.");
-                    $this->dispatch('orderCompleted');
-                    return ['success' => true, 'message' => 'Order placed successfully', 'redirect' => route('home')];
-                } else {
-                    return ['success' => false, 'message' => 'Order creation failed'];
-                }
+                
+                $deliveryDate = now()->addDays(4)->format('M j, Y');
+                session()->flash('order_success', "Thank you for your purchase! Your payment has been processed successfully. Order will be delivered by {$deliveryDate}.");
+                
+                return [
+                    'success' => true,
+                    'message' => 'Order placed successfully',
+                    'redirect' => route('home')
+                ];
             } else {
-                // Payment failed
-                \Log::error('Payment failed with status: ' . $paymentIntent->status);
-                $this->handlePaymentError('Payment failed. Please try again.');
-                return ['success' => false, 'message' => 'Payment failed'];
+                throw new \Exception('Failed to create order');
             }
             
         } catch (\Exception $e) {
-            \Log::error('Stripe payment error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
-            $this->handlePaymentError('Payment processing failed: ' . $e->getMessage());
-            return ['success' => false, 'message' => 'Payment processing failed: ' . $e->getMessage()];
+            \Log::error('Order creation after payment failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Order processing failed: ' . $e->getMessage()
+            ];
         }
     }
     
@@ -203,10 +222,7 @@ class CheckoutPage extends Component
             } while (Order::where('order_id', $orderId)->exists());
 
             // Determine payment status based on payment method
-            $paymentStatus = 'pending';
-            if ($this->payment_method === 'card' && $this->stripe_payment_intent_id) {
-                $paymentStatus = 'paid';
-            }
+            $paymentStatus = $this->payment_method === 'card' ? 'paid' : 'pending';
 
             // Create order
             $order = Order::create([
