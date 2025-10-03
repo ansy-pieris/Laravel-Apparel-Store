@@ -175,141 +175,30 @@
     </div>
 </div>
 
-@push('scripts')
 <script src="https://js.stripe.com/v3/"></script>
 <script>
-// Wait for everything to load
-window.addEventListener('load', function() {
-    console.log('🚀 Page fully loaded, initializing Stripe...');
-    
-    // Hard-coded Stripe key for testing
-    const stripeKey = 'pk_test_51S0gYfKyfRZGi0cj0Q2x7dEWuN4totRdghbjZQa8bzIA7mPjSeD6aAYgjbHOwahhhXhgKAFHT3tbukYLzCP8IwPq00kpxq5pIK';
-    console.log('Using Stripe key:', stripeKey);
+document.addEventListener('DOMContentLoaded', function() {
+    alert('JavaScript is working!');
+    console.log('🚀 Script loaded successfully');
     
     // Initialize Stripe
-    let stripe, elements, cardElement;
-    
-    try {
-        stripe = Stripe(stripeKey);
-        elements = stripe.elements();
-        console.log('✅ Stripe initialized successfully');
-        
-        // Create card element
-        cardElement = elements.create('card', {
-            style: {
-                base: {
-                    fontSize: '16px',
-                    color: '#ffffff',
-                    backgroundColor: 'transparent',
-                    '::placeholder': {
-                        color: '#9ca3af',
-                    },
-                },
-                invalid: {
-                    color: '#ef4444',
-                },
-            },
-            hidePostalCode: true
-        });
-        console.log('✅ Card element created');
-        
-    } catch (error) {
-        console.error('❌ Failed to initialize Stripe:', error);
-        return;
-    }
-    
-    let cardMounted = false;
+    const stripe = Stripe('pk_test_51S0gYfKyfRZGi0cj0Q2x7dEWuN4totRdghbjZQa8bzIA7mPjSeD6aAYgjbHOwahhhXhgKAFHT3tbukYLzCP8IwPq00kpxq5pIK');
+    const elements = stripe.elements();
 
-    // Mount card element immediately if card payment is selected
-    function mountCardElement() {
-        const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
-        const cardContainer = document.getElementById('card-element');
-        
-        console.log('🔍 Payment method:', paymentMethod);
-        console.log('🔍 Card container exists:', !!cardContainer);
-        
-        if (paymentMethod === 'card' && cardContainer && !cardMounted) {
-            try {
-                cardElement.mount('#card-element');
-                cardMounted = true;
-                console.log('✅ Card element mounted successfully!');
-                
-                // Test if we can focus the element
-                setTimeout(() => {
-                    cardElement.focus();
-                    console.log('✅ Card element focused');
-                }, 500);
-                
-            } catch (error) {
-                console.error('❌ Failed to mount card element:', error);
-            }
-        } else if (paymentMethod === 'cod' && cardMounted) {
-            try {
-                cardElement.unmount();
-                cardMounted = false;
-                console.log('✅ Card element unmounted');
-            } catch (error) {
-                console.error('❌ Failed to unmount card element:', error);
-            }
-        }
-    }
-
-    // Handle payment method changes
-    const paymentRadios = document.querySelectorAll('input[name="payment_method"]');
-    console.log('📻 Found payment radios:', paymentRadios.length);
+    // Create card element
+    const cardElement = elements.create('card');
     
-    paymentRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            console.log('🔄 Payment method changed to:', this.value);
-            setTimeout(mountCardElement, 200);
-        });
-    });
-
-    // Initial mount with multiple attempts
-    let attempts = 0;
-    const maxAttempts = 5;
-    
-    function tryMount() {
-        attempts++;
-        console.log(`🔄 Mount attempt ${attempts}...`);
-        
-        const cardContainer = document.getElementById('card-element');
-        if (cardContainer) {
-            mountCardElement();
-        } else if (attempts < maxAttempts) {
-            setTimeout(tryMount, 1000);
+    // Mount it immediately to card-element
+    setTimeout(function() {
+        const container = document.getElementById('card-element');
+        if (container) {
+            cardElement.mount('#card-element');
+            console.log('✅ Card mounted');
+            alert('Card element mounted! Try typing now.');
         } else {
-            console.error('❌ Could not find card container after 5 attempts');
+            console.log('❌ No card container found');
+            alert('Card container not found');
         }
-    }
-    
-    tryMount();
-
-    // Handle card validation
-    if (cardElement) {
-        cardElement.on('change', function(event) {
-            console.log('💳 Card changed:', event.complete ? 'Complete' : 'Incomplete');
-            const displayError = document.getElementById('card-errors');
-            if (displayError) {
-                if (event.error) {
-                    displayError.textContent = event.error.message;
-                    console.log('❌ Card error:', event.error.message);
-                } else {
-                    displayError.textContent = '';
-                }
-            }
-        });
-
-        cardElement.on('ready', function() {
-            console.log('✅ Card element is ready for input!');
-        });
-
-        cardElement.on('focus', function() {
-            console.log('✅ Card element focused!');
-        });
-    }
-
-    console.log('🎉 Stripe setup complete!');
+    }, 1000);
 });
 </script>
-@endpush
