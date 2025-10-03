@@ -194,8 +194,20 @@
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
+// EMERGENCY DEBUGGING - RUN IMMEDIATELY
+console.log('🔍 SCRIPT STARTED - Checking basic elements...');
+console.log('Card number input exists:', !!document.getElementById('card-number-input'));
+console.log('Card expiry input exists:', !!document.getElementById('card-expiry-input'));
+console.log('Card CVC input exists:', !!document.getElementById('card-cvc-input'));
+console.log('Place order button exists:', !!document.getElementById('place-order-btn'));
+console.log('Form exists:', !!document.querySelector('form'));
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM loaded, checking Stripe availability...');
+    
+    // Double-check elements after DOM loads
+    console.log('After DOM load - Card number input:', !!document.getElementById('card-number-input'));
+    console.log('After DOM load - Place order button:', !!document.getElementById('place-order-btn'));
     
     // Check if Stripe is loaded
     if (typeof Stripe === 'undefined') {
@@ -264,6 +276,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (paymentMethod === 'card') {
             // Show card section
+            console.log('🎯 CARD PAYMENT SELECTED!');
+            alert('Card payment selected - card section should show');
+            
             if (cardSection) {
                 cardSection.classList.remove('hidden');
                 console.log('✅ Card section shown, classList:', cardSection.classList.toString());
@@ -383,11 +398,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Debug button clicks
     const placeOrderBtn = document.getElementById('place-order-btn');
     if (placeOrderBtn) {
+        console.log('✅ Place Order button found, attaching click listener');
         placeOrderBtn.addEventListener('click', function(e) {
             console.log('🖱️ Place Order button clicked!');
             const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
             console.log('Payment method at button click:', paymentMethod);
+            
+            // Add visual feedback
+            this.style.backgroundColor = '#dc2626';
+            this.textContent = 'Button Clicked!';
+            setTimeout(() => {
+                this.style.backgroundColor = '#dc3545';
+                this.textContent = 'Place Order';
+            }, 1000);
         });
+    } else {
+        console.log('❌ Place Order button NOT found!');
     }
     
     // Handle form submission
