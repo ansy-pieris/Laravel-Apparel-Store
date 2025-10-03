@@ -108,7 +108,13 @@ class CheckoutPage extends Component
             ]);
             
             // Validate form first
-            $this->validate();
+            try {
+                $this->validate();
+                \Log::info('Form validation passed');
+            } catch (\Exception $validationError) {
+                \Log::error('Form validation failed: ' . $validationError->getMessage());
+                throw $validationError;
+            }
             
             // Set Stripe API key
             Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
@@ -138,14 +144,20 @@ class CheckoutPage extends Component
             
             if ($paymentIntent->status === 'requires_action') {
                 // 3D Secure authentication required
+                \Log::info('Payment requires 3D Secure authentication');
                 $this->dispatch('confirmPayment', [
                     'client_secret' => $paymentIntent->client_secret
                 ]);
+                return ['success' => false, 'message' => '3D Secure authentication required', 'requires_action' => true];
             } else if ($paymentIntent->status === 'succeeded') {
                 // Payment succeeded immediately
                 \Log::info('Payment succeeded, completing order');
-                $this->completeOrder();
-                return ['success' => true, 'message' => 'Order placed successfully'];
+                $orderResult = $this->completeOrder();
+                if ($orderResult) {
+                    return ['success' => true, 'message' => 'Order placed successfully', 'redirect' => route('home')];
+                } else {
+                    return ['success' => true, 'message' => 'Order placed successfully'];
+                }
             } else {
                 // Payment failed
                 \Log::error('Payment failed with status: ' . $paymentIntent->status);
@@ -173,7 +185,7 @@ class CheckoutPage extends Component
     public function completeOrder()
     {
         // Complete the order after successful payment
-        $this->createOrder();
+        return $this->createOrder();
     }
     
     private function createOrder()
@@ -250,8 +262,8 @@ class CheckoutPage extends Component
             // Dispatch event to update cart counter
             $this->dispatch('cartUpdated');
 
-            // Redirect to home
-            return redirect()->route('home');
+            // Return success indicator instead of redirect for AJAX calls
+            return true;
 
         } catch (\Exception $e) {
             DB::rollback();
@@ -261,6 +273,7 @@ class CheckoutPage extends Component
             ]);
             
             $this->handlePaymentError('Order processing failed. Please contact support.');
+            return false;
         }
     }
 

@@ -488,21 +488,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Send to Livewire backend
                 try {
-                    console.log('📤 Calling Livewire processStripePayment...');
+                    console.log('📤 Calling Livewire processStripePayment with ID:', stripePaymentMethod.id);
+                    
+                    // Call the Livewire method
                     const livewireResult = await @this.processStripePayment(stripePaymentMethod.id);
                     console.log('✅ Livewire completed successfully:', livewireResult);
                     
-                    // Check if we need to redirect or show success
-                    if (livewireResult && livewireResult.redirect) {
+                    // Check the result
+                    if (livewireResult && livewireResult.success) {
+                        console.log('🎉 Order placed successfully!');
+                        document.getElementById('card-errors').innerHTML = '<span style="color: #10b981;">✅ ' + (livewireResult.message || 'Order placed successfully!') + '</span>';
+                        
+                        // Redirect after success
+                        setTimeout(() => {
+                            window.location.href = '/orders';
+                        }, 2000);
+                    } else if (livewireResult && livewireResult.redirect) {
+                        console.log('🔄 Redirecting to:', livewireResult.redirect);
                         window.location.href = livewireResult.redirect;
                     } else {
-                        // Success - order should be placed
-                        document.getElementById('card-errors').innerHTML = '<span style="color: #10b981;">✅ Order placed successfully!</span>';
+                        console.log('❌ Unexpected result format:', livewireResult);
+                        document.getElementById('card-errors').textContent = livewireResult.message || 'Payment processing completed but order status unclear';
                     }
                     
                 } catch (livewireError) {
                     console.log('❌ Livewire error:', livewireError);
-                    document.getElementById('card-errors').textContent = 'Order processing failed: ' + (livewireError.message || 'Unknown error');
+                    console.log('❌ Error details:', JSON.stringify(livewireError));
+                    
+                    let errorMessage = 'Order processing failed';
+                    if (livewireError.message) {
+                        errorMessage += ': ' + livewireError.message;
+                    } else if (typeof livewireError === 'string') {
+                        errorMessage += ': ' + livewireError;
+                    }
+                    
+                    document.getElementById('card-errors').textContent = errorMessage;
                 } finally {
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalText;
