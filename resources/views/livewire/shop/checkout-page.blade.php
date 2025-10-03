@@ -204,27 +204,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to show/hide card section and mount Stripe element
     function toggleCardSection() {
         const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+        console.log('Payment method selected:', paymentMethod);
         
         if (paymentMethod === 'card') {
             // Show card section
-            cardSection.classList.remove('hidden');
-            
-            // Mount Stripe element only once
-            if (!cardMounted) {
-                try {
-                    cardElement.mount('#card-element');
-                    cardMounted = true;
-                    console.log('✅ Stripe card element mounted successfully');
-                    
-                    // Focus the card element
-                    setTimeout(() => cardElement.focus(), 100);
-                } catch (error) {
-                    console.error('❌ Error mounting Stripe element:', error);
+            if (cardSection) {
+                cardSection.classList.remove('hidden');
+                console.log('✅ Card section shown');
+                
+                // Mount Stripe element only once
+                if (!cardMounted) {
+                    try {
+                        cardElement.mount('#card-element');
+                        cardMounted = true;
+                        console.log('✅ Stripe card element mounted successfully');
+                        
+                        // Focus the card element
+                        setTimeout(() => cardElement.focus(), 100);
+                    } catch (error) {
+                        console.error('❌ Error mounting Stripe element:', error);
+                    }
                 }
             }
         } else {
             // Hide card section
-            cardSection.classList.add('hidden');
+            if (cardSection) {
+                cardSection.classList.add('hidden');
+                console.log('✅ Card section hidden');
+            }
         }
     }
     
@@ -234,7 +241,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Initial toggle based on current selection
-    setTimeout(toggleCardSection, 100);
+    setTimeout(function() {
+        console.log('Running initial toggle...');
+        toggleCardSection();
+    }, 100);
     
     // Handle card validation
     cardElement.on('change', function(event) {
