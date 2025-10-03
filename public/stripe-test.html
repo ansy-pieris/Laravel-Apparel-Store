@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .card-container { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        #card-element { background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; }
+        .error { color: red; margin-top: 10px; }
+        .success { color: green; margin-top: 10px; }
+        .payment-methods { margin: 20px 0; }
+        .payment-methods label { display: block; margin: 10px 0; }
+        #card-section { margin-top: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Stripe Integration Test</h1>
+    <div id="console-output"></div>
+    
+    <div class="payment-methods">
+        <h3>Payment Method:</h3>
+        <label>
+            <input type="radio" name="payment_method" value="cod" checked> Cash on Delivery
+        </label>
+        <label>
+            <input type="radio" name="payment_method" value="card"> Card Payment
+        </label>
+    </div>
+    
+    <div id="card-section" class="card-container hidden">
+        <h3>Card Details</h3>
+        <p>Use test card: 4242 4242 4242 4242</p>
+        <div id="card-element"></div>
+        <div id="card-errors" class="error"></div>
+    </div>
+    
+    <button id="test-btn" style="margin-top: 20px; padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 4px;">
+        Test Payment
+    </button>
+    
+    <div id="results"></div>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        // Console logging function
+        function log(message, type = 'info') {
+            console.log(message);
+            const output = document.getElementById('console-output');
+            const div = document.createElement('div');
+            div.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            output.appendChild(div);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 DOM loaded, starting Stripe test...');
+            
+            // Check if Stripe is loaded
+            if (typeof Stripe === 'undefined') {
+                log('❌ Stripe is not loaded! Check CSP settings.', 'error');
+                document.getElementById('card-errors').textContent = 'Stripe not loaded - CSP issue';
+                return;
+            }
+            
+            log('✅ Stripe is available');
+            
+            try {
+                // Initialize Stripe with test key
+                const stripe = Stripe('pk_test_51S0gYfKyfRZGi0cj0Q2x7dEWuN4totRdghbjZQa8bzIA7mPjSeD6aAYgjbHOwahhhXhgKAFHT3tbukYLzCP8IwPq00kpxq5pIK');
+                const elements = stripe.elements();
+                log('✅ Stripe elements created');
+                
+                // Create card element
+                const cardElement = elements.create('card', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#333',
+                            '::placeholder': { color: '#aaa' }
+                        }
+                    }
+                });
+                log('✅ Card element created');
+                
+                let cardMounted = false;
+                const cardSection = document.getElementById('card-section');
+                
+                // Payment method toggle
+                function toggleCardSection() {
+                    const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+                    log('Payment method selected: ' + paymentMethod);
+                    
+                    if (paymentMethod === 'card') {
+                        cardSection.classList.remove('hidden');
+                        log('✅ Card section shown');
+                        
+                        if (!cardMounted) {
+                            try {
+                                cardElement.mount('#card-element');
+                                cardMounted = true;
+                                log('✅ Card element mounted successfully', 'success');
+                                setTimeout(() => cardElement.focus(), 100);
+                            } catch (error) {
+                                log('❌ Error mounting card element: ' + error.message, 'error');
+                            }
+                        }
+                    } else {
+                        cardSection.classList.add('hidden');
+                        log('Card section hidden');
+                    }
+                }
+                
+                // Listen to radio button changes
+                document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+                    radio.addEventListener('change', toggleCardSection);
+                });
+                
+                // Card events
+                cardElement.on('ready', function() {
+                    log('🎉 Card element is ready for input!', 'success');
+                });
+                
+                cardElement.on('change', function(event) {
+                    if (event.error) {
+                        document.getElementById('card-errors').textContent = event.error.message;
+                        log('Card validation error: ' + event.error.message, 'error');
+                    } else {
+                        document.getElementById('card-errors').textContent = '';
+                        if (event.complete) {
+                            log('✅ Card details are complete and valid', 'success');
+                        }
+                    }
+                });
+                
+                // Test button
+                document.getElementById('test-btn').addEventListener('click', async function() {
+                    const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+                    
+                    if (paymentMethod !== 'card') {
+                        log('COD selected - no card processing needed');
+                        return;
+                    }
+                    
+                    if (!cardMounted) {
+                        log('❌ Card not mounted yet', 'error');
+                        return;
+                    }
+                    
+                    log('Testing payment method creation...');
+                    
+                    try {
+                        const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
+                            type: 'card',
+                            card: cardElement,
+                        });
+                        
+                        if (error) {
+                            log('❌ Payment method error: ' + error.message, 'error');
+                        } else {
+                            log('✅ Payment method created: ' + stripePaymentMethod.id, 'success');
+                            document.getElementById('results').innerHTML = '<div style="color: green;">Success! Payment method: ' + stripePaymentMethod.id + '</div>';
+                        }
+                    } catch (err) {
+                        log('❌ Exception: ' + err.message, 'error');
+                    }
+                });
+                
+                log('🎉 Setup complete!');
+                
+            } catch (error) {
+                log('❌ Setup error: ' + error.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
