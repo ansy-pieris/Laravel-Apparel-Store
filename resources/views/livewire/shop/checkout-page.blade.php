@@ -140,7 +140,7 @@
                             <!-- Single Card Element -->
                             <div>
                                 <label class="block text-sm font-medium mb-1">Card Information</label>
-                                <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px]">
+                                <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px] cursor-text hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
                                     <!-- Stripe card element will be mounted here -->
                                 </div>
                             </div>
@@ -199,6 +199,8 @@ document.addEventListener('DOMContentLoaded', function() {
             base: {
                 fontSize: '16px',
                 color: '#ffffff',
+                fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                fontSmoothing: 'antialiased',
                 '::placeholder': {
                     color: '#9ca3af',
                 },
@@ -207,6 +209,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 color: '#ef4444',
             },
         },
+        hidePostalCode: true
     });
     
     let cardMounted = false;
@@ -233,8 +236,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         cardMounted = true;
                         console.log('✅ Stripe card element mounted successfully');
                         
-                        // Focus the card element
-                        setTimeout(() => cardElement.focus(), 100);
+                        // Force focus and click after mounting
+                        setTimeout(() => {
+                            cardElement.focus();
+                            console.log('🎯 Focused card element');
+                            
+                            // Click the card element container
+                            const cardContainer = document.getElementById('card-element');
+                            if (cardContainer) {
+                                cardContainer.click();
+                                console.log('👆 Clicked card container for interaction');
+                            }
+                        }, 500);
                     } catch (error) {
                         console.error('❌ Error mounting Stripe element:', error);
                     }
