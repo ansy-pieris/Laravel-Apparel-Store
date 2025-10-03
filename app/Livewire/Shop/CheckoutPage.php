@@ -101,14 +101,22 @@ class CheckoutPage extends Component
     public function processStripePayment($paymentMethodId)
     {
         try {
+            \Log::info('ProcessStripePayment called', [
+                'payment_method_id' => $paymentMethodId,
+                'total' => $this->total,
+                'user_id' => Auth::id()
+            ]);
+            
             // Validate form first
             $this->validate();
             
             // Set Stripe API key
             Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
+            \Log::info('Stripe API key set');
             
             // Store payment method ID
             $this->stripe_payment_method_id = $paymentMethodId;
+            \Log::info('Payment method ID stored: ' . $paymentMethodId);
             
             // Create payment intent
             $paymentIntent = PaymentIntent::create([
@@ -135,15 +143,22 @@ class CheckoutPage extends Component
                 ]);
             } else if ($paymentIntent->status === 'succeeded') {
                 // Payment succeeded immediately
+                \Log::info('Payment succeeded, completing order');
                 $this->completeOrder();
+                return ['success' => true, 'message' => 'Order placed successfully'];
             } else {
                 // Payment failed
+                \Log::error('Payment failed with status: ' . $paymentIntent->status);
                 $this->handlePaymentError('Payment failed. Please try again.');
+                return ['success' => false, 'message' => 'Payment failed'];
             }
             
         } catch (\Exception $e) {
-            \Log::error('Stripe payment error: ' . $e->getMessage());
-            $this->handlePaymentError('Payment processing failed. Please try again.');
+            \Log::error('Stripe payment error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->handlePaymentError('Payment processing failed: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Payment processing failed: ' . $e->getMessage()];
         }
     }
     

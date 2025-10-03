@@ -304,28 +304,80 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleCardSection();
     }, 100);
     
-    // Simple validation for HTML inputs
+    // Enhanced validation for HTML inputs
     function validateCardInputs() {
         const cardNumber = cardNumberInput ? cardNumberInput.value.replace(/\s/g, '') : '';
         const cardExpiry = cardExpiryInput ? cardExpiryInput.value : '';
         const cardCvc = cardCvcInput ? cardCvcInput.value : '';
         
-        if (!cardNumber || cardNumber.length < 13) {
-            return 'Please enter a valid card number';
+        console.log('🔍 Validating:', { cardNumber: cardNumber.substring(0, 4) + '****', cardExpiry, cardCvc });
+        
+        if (!cardNumber || cardNumber.length < 13 || cardNumber.length > 19) {
+            return 'Card number must be 13-19 digits';
+        }
+        
+        if (!/^\d+$/.test(cardNumber)) {
+            return 'Card number must contain only numbers';
         }
         
         if (!cardExpiry || !cardExpiry.includes('/')) {
             return 'Please enter expiry date (MM/YY)';
         }
         
-        if (!cardCvc || cardCvc.length < 3) {
-            return 'Please enter CVC';
+        const [month, year] = cardExpiry.split('/');
+        if (!month || !year || month.length !== 2 || year.length !== 2) {
+            return 'Invalid expiry format (use MM/YY)';
         }
         
+        const monthNum = parseInt(month);
+        const yearNum = parseInt('20' + year);
+        if (monthNum < 1 || monthNum > 12) {
+            return 'Invalid month (01-12)';
+        }
+        
+        const currentYear = new Date().getFullYear();
+        if (yearNum < currentYear || yearNum > currentYear + 20) {
+            return 'Invalid expiry year';
+        }
+        
+        if (!cardCvc || cardCvc.length < 3 || cardCvc.length > 4) {
+            return 'CVC must be 3-4 digits';
+        }
+        
+        if (!/^\d+$/.test(cardCvc)) {
+            return 'CVC must contain only numbers';
+        }
+        
+        console.log('✅ Card validation passed');
         return null;
     }
     
-    console.log('✅ Simple HTML card inputs ready - NO GRAY BARS!');
+    // Real-time validation feedback
+    function showValidationFeedback() {
+        const errorDiv = document.getElementById('card-errors');
+        const validationError = validateCardInputs();
+        
+        if (validationError) {
+            errorDiv.textContent = validationError;
+            errorDiv.style.color = '#ef4444';
+        } else {
+            errorDiv.textContent = '✅ Card details look good';
+            errorDiv.style.color = '#10b981';
+        }
+    }
+    
+    // Add real-time validation
+    if (cardNumberInput) {
+        cardNumberInput.addEventListener('blur', showValidationFeedback);
+    }
+    if (cardExpiryInput) {
+        cardExpiryInput.addEventListener('blur', showValidationFeedback);
+    }
+    if (cardCvcInput) {
+        cardCvcInput.addEventListener('blur', showValidationFeedback);
+    }
+    
+    console.log('✅ Enhanced validation ready!');
     
     // Handle form submission
     const form = document.querySelector('form');
@@ -349,9 +401,12 @@ document.addEventListener('DOMContentLoaded', function() {
             submitButton.innerHTML = '<span>Processing Payment...</span>';
             
             try {
+                console.log('🚀 Starting payment processing...');
+                
                 // Validate inputs first
                 const validationError = validateCardInputs();
                 if (validationError) {
+                    console.log('❌ Validation failed:', validationError);
                     document.getElementById('card-errors').textContent = validationError;
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalText;
@@ -362,6 +417,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const cardNumber = cardNumberInput.value.replace(/\s/g, '');
                 const cardExpiry = cardExpiryInput.value.split('/');
                 const cardCvc = cardCvcInput.value;
+                const recipientName = document.querySelector('input[wire\\:model="recipient_name"]')?.value || 'Customer';
+                
+                console.log('💳 Creating payment method with:', {
+                    cardNumber: cardNumber.substring(0, 4) + '****',
+                    exp_month: cardExpiry[0],
+                    exp_year: '20' + cardExpiry[1],
+                    cvc: cardCvc.length + ' digits',
+                    name: recipientName
+                });
                 
                 const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
                     type: 'card',
@@ -372,19 +436,55 @@ document.addEventListener('DOMContentLoaded', function() {
                         cvc: cardCvc,
                     },
                     billing_details: {
-                        name: document.querySelector('input[wire\\:model="recipient_name"]').value,
+                        name: recipientName,
                     }
                 });
                 
+                console.log('📝 Stripe response:', { error, paymentMethodId: stripePaymentMethod?.id });
+                
                 if (error) {
+                    console.log('❌ Stripe error:', error);
                     document.getElementById('card-errors').textContent = error.message;
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalText;
                     return;
                 }
                 
+                if (!stripePaymentMethod || !stripePaymentMethod.id) {
+                    console.log('❌ No payment method created');
+                    document.getElementById('card-errors').textContent = 'Failed to create payment method';
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                    return;
+                }
+                
+                console.log('✅ Payment method created successfully:', stripePaymentMethod.id);
+                console.log('📤 Sending to Livewire backend...');
+                
+                // Clear any previous errors
+                document.getElementById('card-errors').textContent = '';
+                
                 // Send to Livewire backend
-                @this.processStripePayment(stripePaymentMethod.id);
+                try {
+                    console.log('📤 Calling Livewire processStripePayment...');
+                    const livewireResult = await @this.processStripePayment(stripePaymentMethod.id);
+                    console.log('✅ Livewire completed successfully:', livewireResult);
+                    
+                    // Check if we need to redirect or show success
+                    if (livewireResult && livewireResult.redirect) {
+                        window.location.href = livewireResult.redirect;
+                    } else {
+                        // Success - order should be placed
+                        document.getElementById('card-errors').innerHTML = '<span style="color: #10b981;">✅ Order placed successfully!</span>';
+                    }
+                    
+                } catch (livewireError) {
+                    console.log('❌ Livewire error:', livewireError);
+                    document.getElementById('card-errors').textContent = 'Order processing failed: ' + (livewireError.message || 'Unknown error');
+                } finally {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                }
                 
             } catch (err) {
                 console.error('Payment error:', err);
