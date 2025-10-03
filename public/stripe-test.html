@@ -51,20 +51,20 @@
         <h3>Card Details</h3>
         <p>Use test card: 4242 4242 4242 4242</p>
         
-        <!-- Try separate card fields -->
+        <!-- Clean card fields without gray bars -->
         <div style="margin-bottom: 15px;">
             <label>Card Number</label>
-            <div id="card-number-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; min-height: 40px;"></div>
+            <div id="card-number-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; height: 40px; line-height: 16px;"></div>
         </div>
         
         <div style="display: flex; gap: 15px; margin-bottom: 15px;">
             <div style="flex: 1;">
                 <label>Expiry</label>
-                <div id="card-expiry-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; min-height: 40px;"></div>
+                <div id="card-expiry-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; height: 40px; line-height: 16px;"></div>
             </div>
             <div style="flex: 1;">
                 <label>CVC</label>
-                <div id="card-cvc-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; min-height: 40px;"></div>
+                <div id="card-cvc-element" style="background: white; padding: 12px; border: 1px solid #ccc; border-radius: 4px; height: 40px; line-height: 16px;"></div>
             </div>
         </div>
         
@@ -107,14 +107,22 @@
                 const elements = stripe.elements();
                 log('✅ Stripe elements created');
                 
-                // Create separate card elements
+                // Create separate card elements with clean styling
                 const cardNumberElement = elements.create('cardNumber', {
                     style: {
                         base: {
                             fontSize: '16px',
-                            color: '#424770',
+                            color: '#333333',
                             fontFamily: 'Arial, sans-serif',
-                            '::placeholder': { color: '#aab7c4' }
+                            lineHeight: '16px',
+                            padding: '0px',
+                            '::placeholder': { 
+                                color: '#999999',
+                                fontSize: '16px'
+                            }
+                        },
+                        invalid: {
+                            color: '#e74c3c'
                         }
                     }
                 });
@@ -123,9 +131,17 @@
                     style: {
                         base: {
                             fontSize: '16px',
-                            color: '#424770',
+                            color: '#333333',
                             fontFamily: 'Arial, sans-serif',
-                            '::placeholder': { color: '#aab7c4' }
+                            lineHeight: '16px',
+                            padding: '0px',
+                            '::placeholder': { 
+                                color: '#999999',
+                                fontSize: '16px'
+                            }
+                        },
+                        invalid: {
+                            color: '#e74c3c'
                         }
                     }
                 });
@@ -134,9 +150,17 @@
                     style: {
                         base: {
                             fontSize: '16px',
-                            color: '#424770',
+                            color: '#333333',
                             fontFamily: 'Arial, sans-serif',
-                            '::placeholder': { color: '#aab7c4' }
+                            lineHeight: '16px',
+                            padding: '0px',
+                            '::placeholder': { 
+                                color: '#999999',
+                                fontSize: '16px'
+                            }
+                        },
+                        invalid: {
+                            color: '#e74c3c'
                         }
                     }
                 });

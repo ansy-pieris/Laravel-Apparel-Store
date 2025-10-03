@@ -137,11 +137,26 @@
                             <label class="block font-semibold">Card Details*</label>
                             <p class="text-sm text-gray-400">Use test card: 4242 4242 4242 4242</p>
                             
-                            <!-- Single Card Element -->
+                            <!-- Separate Card Fields -->
                             <div>
-                                <label class="block text-sm font-medium mb-1">Card Information</label>
-                                <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px] cursor-text hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                                    <!-- Stripe card element will be mounted here -->
+                                <label class="block text-sm font-medium mb-1">Card Number</label>
+                                <div id="card-number-element" class="p-3 bg-gray-800 border border-gray-600 rounded h-[40px] cursor-text hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                                    <!-- Card number element -->
+                                </div>
+                            </div>
+                            
+                            <div class="flex space-x-4">
+                                <div class="flex-1">
+                                    <label class="block text-sm font-medium mb-1">Expiry</label>
+                                    <div id="card-expiry-element" class="p-3 bg-gray-800 border border-gray-600 rounded h-[40px] cursor-text hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                                        <!-- Card expiry element -->
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <label class="block text-sm font-medium mb-1">CVC</label>
+                                    <div id="card-cvc-element" class="p-3 bg-gray-800 border border-gray-600 rounded h-[40px] cursor-text hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                                        <!-- Card CVC element -->
+                                    </div>
                                 </div>
                             </div>
                             
@@ -193,23 +208,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const stripe = Stripe('{{ config('services.stripe.key') }}');
     const elements = stripe.elements();
     
-    // Create card element with proper styling
-    const cardElement = elements.create('card', {
+    // Create separate card elements with clean styling
+    const cardNumberElement = elements.create('cardNumber', {
         style: {
             base: {
                 fontSize: '16px',
                 color: '#ffffff',
-                fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-                fontSmoothing: 'antialiased',
+                fontFamily: 'Arial, sans-serif',
+                lineHeight: '16px',
                 '::placeholder': {
                     color: '#9ca3af',
-                },
+                }
             },
             invalid: {
                 color: '#ef4444',
+            }
+        }
+    });
+    
+    const cardExpiryElement = elements.create('cardExpiry', {
+        style: {
+            base: {
+                fontSize: '16px',
+                color: '#ffffff',
+                fontFamily: 'Arial, sans-serif',
+                lineHeight: '16px',
+                '::placeholder': {
+                    color: '#9ca3af',
+                }
             },
-        },
-        hidePostalCode: true
+            invalid: {
+                color: '#ef4444',
+            }
+        }
+    });
+    
+    const cardCvcElement = elements.create('cardCvc', {
+        style: {
+            base: {
+                fontSize: '16px',
+                color: '#ffffff',
+                fontFamily: 'Arial, sans-serif',
+                lineHeight: '16px',
+                '::placeholder': {
+                    color: '#9ca3af',
+                }
+            },
+            invalid: {
+                color: '#ef4444',
+            }
+        }
     });
     
     let cardMounted = false;
@@ -229,27 +277,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 cardSection.classList.remove('hidden');
                 console.log('✅ Card section shown, classList:', cardSection.classList.toString());
                 
-                // Mount Stripe element only once
+                // Mount separate Stripe elements only once
                 if (!cardMounted) {
                     try {
-                        cardElement.mount('#card-element');
+                        cardNumberElement.mount('#card-number-element');
+                        cardExpiryElement.mount('#card-expiry-element');
+                        cardCvcElement.mount('#card-cvc-element');
                         cardMounted = true;
-                        console.log('✅ Stripe card element mounted successfully');
+                        console.log('✅ Separate Stripe card elements mounted successfully');
                         
-                        // Force focus and click after mounting
+                        // Focus the card number field
                         setTimeout(() => {
-                            cardElement.focus();
-                            console.log('🎯 Focused card element');
-                            
-                            // Click the card element container
-                            const cardContainer = document.getElementById('card-element');
-                            if (cardContainer) {
-                                cardContainer.click();
-                                console.log('👆 Clicked card container for interaction');
-                            }
-                        }, 500);
+                            cardNumberElement.focus();
+                            console.log('🎯 Focused card number element');
+                        }, 300);
                     } catch (error) {
-                        console.error('❌ Error mounting Stripe element:', error);
+                        console.error('❌ Error mounting Stripe elements:', error);
                     }
                 }
             }
@@ -276,18 +319,30 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleCardSection();
     }, 100);
     
-    // Handle card validation
-    cardElement.on('change', function(event) {
+    // Handle card validation for separate elements
+    function handleCardError(event) {
         const displayError = document.getElementById('card-errors');
         if (event.error) {
             displayError.textContent = event.error.message;
         } else {
             displayError.textContent = '';
         }
+    }
+    
+    cardNumberElement.on('change', handleCardError);
+    cardExpiryElement.on('change', handleCardError);
+    cardCvcElement.on('change', handleCardError);
+    
+    cardNumberElement.on('ready', function() {
+        console.log('✅ Card number element is ready for input!');
     });
     
-    cardElement.on('ready', function() {
-        console.log('✅ Stripe card element is ready for input!');
+    cardExpiryElement.on('ready', function() {
+        console.log('✅ Card expiry element is ready!');
+    });
+    
+    cardCvcElement.on('ready', function() {
+        console.log('✅ Card CVC element is ready!');
     });
     
     // Handle form submission
@@ -314,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
                     type: 'card',
-                    card: cardElement,
+                    card: cardNumberElement,
                     billing_details: {
                         name: document.querySelector('input[wire\\:model="recipient_name"]').value,
                     }
