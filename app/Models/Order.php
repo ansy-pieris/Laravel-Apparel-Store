@@ -20,7 +20,6 @@ class Order extends Model
         'product_image',
         'payment_method',
         'payment_status',
-        'stripe_payment_intent_id',
         'total_amount'
     ];
 

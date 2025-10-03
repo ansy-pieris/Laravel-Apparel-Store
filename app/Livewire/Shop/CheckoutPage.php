@@ -9,8 +9,6 @@ use App\Models\ShippingAddress;
 use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Stripe\Stripe;
-use Stripe\PaymentIntent;
 
 class CheckoutPage extends Component
 {
@@ -29,8 +27,6 @@ class CheckoutPage extends Component
 
     // Payment properties
     public $payment_method = 'cod';
-    public $stripe_payment_method_id = '';
-    public $stripe_payment_intent_id = '';
 
     protected $rules = [
         'recipient_name' => 'required|string|max:255',
@@ -38,7 +34,7 @@ class CheckoutPage extends Component
         'address' => 'required|string|max:500',
         'city' => 'required|string|max:100',
         'postal_code' => 'required|string|max:10',
-        'payment_method' => 'required|in:cod,card',
+        'payment_method' => 'required|in:cod',
     ];
 
     protected $messages = [
@@ -97,105 +93,6 @@ class CheckoutPage extends Component
         $this->tax = $this->subtotal * 0.0; // 0% tax for now, change as needed
         $this->total = $this->subtotal + $this->tax;
     }
-
-    public function createPaymentIntent()
-    {
-        try {
-            // Validate form first
-            $this->validate();
-            
-            if ($this->itemCount == 0) {
-                throw new \Exception('Your cart is empty.');
-            }
-            
-            // Set Stripe API key
-            Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
-            
-            // Create payment intent
-            $paymentIntent = PaymentIntent::create([
-                'amount' => round($this->total * 100), // Convert to cents
-                'currency' => 'lkr', // Sri Lankan Rupees
-                'automatic_payment_methods' => [
-                    'enabled' => true,
-                ],
-                'metadata' => [
-                    'user_id' => Auth::id(),
-                    'user_email' => Auth::user()->email,
-                    'order_total' => $this->total,
-                    'recipient_name' => $this->recipient_name,
-                    'phone' => $this->phone,
-                    'address' => $this->address,
-                    'city' => $this->city,
-                    'postal_code' => $this->postal_code,
-                ]
-            ]);
-            
-            // Store payment intent ID for later use
-            $this->stripe_payment_intent_id = $paymentIntent->id;
-            
-            \Log::info('PaymentIntent created', [
-                'payment_intent_id' => $paymentIntent->id,
-                'amount' => $paymentIntent->amount,
-                'user_id' => Auth::id()
-            ]);
-            
-            return [
-                'success' => true,
-                'client_secret' => $paymentIntent->client_secret
-            ];
-            
-        } catch (\Exception $e) {
-            \Log::error('PaymentIntent creation failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
-        }
-    }
-
-    public function placeOrderAfterPayment($paymentIntentId)
-    {
-        try {
-            // Verify the payment was successful
-            Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
-            $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
-            
-            if ($paymentIntent->status !== 'succeeded') {
-                throw new \Exception('Payment was not successful');
-            }
-            
-            // Store the payment intent ID
-            $this->stripe_payment_intent_id = $paymentIntentId;
-            
-            // Create the order (similar to COD but with payment info)
-            $orderResult = $this->createOrder();
-            
-            if ($orderResult) {
-                \Log::info('Order created successfully after Stripe payment', [
-                    'payment_intent_id' => $paymentIntentId,
-                    'user_id' => Auth::id()
-                ]);
-                
-                $deliveryDate = now()->addDays(4)->format('M j, Y');
-                session()->flash('order_success', "Thank you for your purchase! Your payment has been processed successfully. Order will be delivered by {$deliveryDate}.");
-                
-                return [
-                    'success' => true,
-                    'message' => 'Order placed successfully',
-                    'redirect' => route('home')
-                ];
-            } else {
-                throw new \Exception('Failed to create order');
-            }
-            
-        } catch (\Exception $e) {
-            \Log::error('Order creation after payment failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Order processing failed: ' . $e->getMessage()
-            ];
-        }
-    }
     
     public function handlePaymentError($message)
     {
@@ -222,7 +119,7 @@ class CheckoutPage extends Component
             } while (Order::where('order_id', $orderId)->exists());
 
             // Determine payment status based on payment method
-            $paymentStatus = $this->payment_method === 'card' ? 'paid' : 'pending';
+            $paymentStatus = 'pending';
 
             // Create order
             $order = Order::create([
@@ -232,7 +129,6 @@ class CheckoutPage extends Component
                 'status' => 'pending',
                 'payment_method' => $this->payment_method,
                 'payment_status' => $paymentStatus,
-                'stripe_payment_intent_id' => $this->stripe_payment_intent_id,
                 'notes' => null,
             ]);
 
@@ -288,8 +184,7 @@ class CheckoutPage extends Component
         } catch (\Exception $e) {
             DB::rollback();
             \Log::error('Order creation failed: ' . $e->getMessage(), [
-                'user_id' => Auth::id(),
-                'stripe_payment_intent_id' => $this->stripe_payment_intent_id
+                'user_id' => Auth::id()
             ]);
             
             $this->handlePaymentError('Order processing failed. Please contact support.');
@@ -299,11 +194,10 @@ class CheckoutPage extends Component
 
     public function placeOrder()
     {
-        // This method now only handles COD payments
-        // Card payments are handled by JavaScript and processStripePayment
+        // This method handles COD payments only
         
         if ($this->payment_method === 'card') {
-            // Card payments should be handled by JavaScript and processStripePayment
+
             $this->addError('payment_error', 'Please use the card form above for card payments.');
             return;
         }

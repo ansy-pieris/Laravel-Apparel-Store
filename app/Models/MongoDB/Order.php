@@ -129,7 +129,7 @@ class Order extends Model
      *   },
      *   "payment": {
      *     "method": "credit_card",
-     *     "provider": "stripe",
+     *     "provider": "bank_transfer",
      *     "transaction_id": "pi_1234567890",
      *     "card_info": {
      *       "last_four": "4242",
