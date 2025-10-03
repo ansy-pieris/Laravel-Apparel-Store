@@ -176,10 +176,21 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Stripe initialized with wire:ignore protection');
+    console.log('🚀 DOM loaded, checking Stripe availability...');
     
+    // Check if Stripe is loaded
+    if (typeof Stripe === 'undefined') {
+        console.error('❌ Stripe is not loaded! Check CSP settings.');
+        const errorElement = document.getElementById('card-errors');
+        if (errorElement) {
+            errorElement.textContent = 'Payment system unavailable. Please refresh the page.';
+        }
+        return;
+    }
+    
+    console.log('✅ Stripe is available, initializing...');
     // Initialize Stripe
-    const stripe = Stripe('pk_test_51S0gYfKyfRZGi0cj0Q2x7dEWuN4totRdghbjZQa8bzIA7mPjSeD6aAYgjbHOwahhhXhgKAFHT3tbukYLzCP8IwPq00kpxq5pIK');
+    const stripe = Stripe('{{ config('services.stripe.key') }}');
     const elements = stripe.elements();
     
     // Create card element with proper styling
