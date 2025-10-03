@@ -197,44 +197,8 @@
 // EMERGENCY DEBUGGING - RUN IMMEDIATELY
 console.log('🔍 SCRIPT STARTED - Checking basic elements...');
 console.log('Card number input exists:', !!document.getElementById('card-number-input'));
-console.log('Card expiry input exists:', !!document.getElementById('card-expiry-input'));
-console.log('Card CVC input exists:', !!document.getElementById('card-cvc-input'));
-console.log('Place order button exists:', !!document.getElementById('place-order-btn'));
-console.log('Form exists:', !!document.querySelector('form'));
-
-// IMMEDIATE BUTTON TEST - No waiting for DOM
-const immediateBtn = document.getElementById('place-order-btn');
-if (immediateBtn) {
-    console.log('✅ FOUND BUTTON IMMEDIATELY - Attaching click handler');
-    immediateBtn.onclick = function() {
-        alert('BUTTON CLICKED - IMMEDIATE HANDLER WORKS!');
-        console.log('🚨 IMMEDIATE BUTTON CLICK DETECTED');
-        return false;
-    };
-} else {
-    console.log('❌ BUTTON NOT FOUND IMMEDIATELY');
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM loaded, checking Stripe availability...');
-    
-    // Double-check elements after DOM loads
-    console.log('After DOM load - Card number input:', !!document.getElementById('card-number-input'));
-    console.log('After DOM load - Place order button:', !!document.getElementById('place-order-btn'));
-    
-    // SECONDARY BUTTON TEST - After DOM loads
-    const domBtn = document.getElementById('place-order-btn');
-    if (domBtn) {
-        console.log('✅ FOUND BUTTON AFTER DOM LOAD');
-        domBtn.addEventListener('click', function(e) {
-            alert('DOM LOADED BUTTON CLICK WORKS!');
-            console.log('🚨 DOM BUTTON CLICK DETECTED');
-            e.preventDefault();
-            return false;
-        });
-    } else {
-        console.log('❌ BUTTON STILL NOT FOUND AFTER DOM LOAD');
-    }
+    console.log('🚀 DOM loaded, initializing checkout...');
     
     // Check if Stripe is loaded
     if (typeof Stripe === 'undefined') {
@@ -304,11 +268,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (paymentMethod === 'card') {
             // Show card section
             console.log('🎯 CARD PAYMENT SELECTED!');
-            alert('Card payment selected - card section should show');
             
             if (cardSection) {
                 cardSection.classList.remove('hidden');
-                console.log('✅ Card section shown, classList:', cardSection.classList.toString());
+                console.log('✅ Card section shown');
                 
                 // Focus the simple HTML input - NO MOUNTING NEEDED
                 if (!cardMounted) {
@@ -422,28 +385,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('✅ Enhanced validation ready!');
     
-    // Debug button clicks
-    const placeOrderBtn = document.getElementById('place-order-btn');
-    if (placeOrderBtn) {
-        console.log('✅ Place Order button found, attaching click listener');
-        placeOrderBtn.addEventListener('click', function(e) {
-            console.log('🖱️ Place Order button clicked!');
-            const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
-            console.log('Payment method at button click:', paymentMethod);
-            
-            // Add visual feedback
-            this.style.backgroundColor = '#dc2626';
-            this.textContent = 'Button Clicked!';
-            setTimeout(() => {
-                this.style.backgroundColor = '#dc3545';
-                this.textContent = 'Place Order';
-            }, 1000);
-        });
-    } else {
-        console.log('❌ Place Order button NOT found!');
-    }
+
     
-    // Handle form submission
+    // Handle form submission - SIMPLIFIED VERSION
     const form = document.querySelector('form');
     if (form) {
         console.log('✅ Form submission handler attached');
@@ -453,168 +397,91 @@ document.addEventListener('DOMContentLoaded', function() {
             const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
             console.log('Form submission - payment method:', paymentMethod);
             
-            // Update Livewire property before submission
-            try {
-                await @this.set('payment_method', paymentMethod);
-                console.log('✅ Payment method set in Livewire');
-            } catch (error) {
-                console.log('❌ Error setting payment method:', error);
-            }
-            
-            if (paymentMethod !== 'card') {
-                console.log('✅ COD order - letting Livewire handle submission');
-                return; // Let Livewire handle COD normally
-            }
-            
-            // Only prevent default for card payments
+            // Always prevent default to handle properly
             event.preventDefault();
-            console.log('🚀 Card payment - handling with Stripe');
             
             const submitButton = form.querySelector('button[type="submit"]');
             const originalText = submitButton.innerHTML;
             submitButton.disabled = true;
-            submitButton.innerHTML = '<span>Processing Payment...</span>';
+            submitButton.innerHTML = '<span>Processing...</span>';
             
             try {
-                console.log('🚀 Starting payment processing...');
+                // Update Livewire property first
+                await @this.set('payment_method', paymentMethod);
+                console.log('✅ Payment method set in Livewire:', paymentMethod);
                 
-                // Validate inputs first
-                const validationError = validateCardInputs();
-                if (validationError) {
-                    console.log('❌ Validation failed:', validationError);
-                    document.getElementById('card-errors').textContent = validationError;
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = originalText;
+                if (paymentMethod === 'cod') {
+                    console.log('🚚 COD order - calling Livewire directly');
+                    // For COD, just call the placeOrder method
+                    const result = await @this.placeOrder();
+                    console.log('✅ COD order placed successfully:', result);
                     return;
                 }
                 
-                // Get card data from HTML inputs
-                const cardNumber = cardNumberInput.value.replace(/\s/g, '');
-                const cardExpiry = cardExpiryInput.value.split('/');
-                const cardCvc = cardCvcInput.value;
-                const recipientName = document.querySelector('input[wire\\:model="recipient_name"]')?.value || 'Customer';
-                
-                console.log('💳 Creating payment method with:', {
-                    cardNumber: cardNumber.substring(0, 4) + '****',
-                    exp_month: cardExpiry[0],
-                    exp_year: '20' + cardExpiry[1],
-                    cvc: cardCvc.length + ' digits',
-                    name: recipientName
-                });
-                
-                const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
-                    type: 'card',
-                    card: {
-                        number: cardNumber,
-                        exp_month: parseInt(cardExpiry[0]),
-                        exp_year: parseInt('20' + cardExpiry[1]),
-                        cvc: cardCvc,
-                    },
-                    billing_details: {
-                        name: recipientName,
+                if (paymentMethod === 'card') {
+                    console.log('� Card payment - processing with Stripe');
+                    
+                    // Validate inputs first
+                    const validationError = validateCardInputs();
+                    if (validationError) {
+                        console.log('❌ Validation failed:', validationError);
+                        document.getElementById('card-errors').textContent = validationError;
+                        throw new Error(validationError);
                     }
-                });
-                
-                console.log('📝 Stripe response:', { error, paymentMethodId: stripePaymentMethod?.id });
-                
-                if (error) {
-                    console.log('❌ Stripe error:', error);
-                    document.getElementById('card-errors').textContent = error.message;
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = originalText;
+                    
+                    // Get card data from HTML inputs
+                    const cardNumber = cardNumberInput.value.replace(/\s/g, '');
+                    const cardExpiry = cardExpiryInput.value.split('/');
+                    const cardCvc = cardCvcInput.value;
+                    const recipientName = document.querySelector('input[wire\\:model="recipient_name"]')?.value || 'Customer';
+                    
+                    console.log('💳 Creating payment method with Stripe...');
+                    
+                    const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
+                        type: 'card',
+                        card: {
+                            number: cardNumber,
+                            exp_month: parseInt(cardExpiry[0]),
+                            exp_year: parseInt('20' + cardExpiry[1]),
+                            cvc: cardCvc,
+                        },
+                        billing_details: {
+                            name: recipientName,
+                        }
+                    });
+                    
+                    if (error) {
+                        console.log('❌ Stripe error:', error);
+                        document.getElementById('card-errors').textContent = error.message;
+                        throw new Error(error.message);
+                    }
+                    
+                    if (!stripePaymentMethod?.id) {
+                        throw new Error('Failed to create payment method');
+                    }
+                    
+                    console.log('✅ Payment method created, calling Livewire...');
+                    
+                    // Send to Livewire backend
+                    const result = await @this.processStripePayment(stripePaymentMethod.id);
+                    console.log('✅ Stripe payment completed successfully:', result);
                     return;
-                }
-                
-                if (!stripePaymentMethod || !stripePaymentMethod.id) {
-                    console.log('❌ No payment method created');
-                    document.getElementById('card-errors').textContent = 'Failed to create payment method';
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = originalText;
-                    return;
-                }
-                
-                console.log('✅ Payment method created successfully:', stripePaymentMethod.id);
-                console.log('📤 Sending to Livewire backend...');
-                
-                // Clear any previous errors
-                document.getElementById('card-errors').textContent = '';
-                
-                // Send to Livewire backend
-                try {
-                    console.log('📤 Calling Livewire processStripePayment with ID:', stripePaymentMethod.id);
-                    
-                    // Call the Livewire method
-                    const livewireResult = await @this.processStripePayment(stripePaymentMethod.id);
-                    console.log('✅ Livewire completed successfully:', livewireResult);
-                    
-                    // Check the result
-                    if (livewireResult && livewireResult.success) {
-                        console.log('🎉 Order placed successfully!');
-                        document.getElementById('card-errors').innerHTML = '<span style="color: #10b981;">✅ ' + (livewireResult.message || 'Order placed successfully!') + '</span>';
-                        
-                        // Redirect after success
-                        setTimeout(() => {
-                            window.location.href = '/orders';
-                        }, 2000);
-                    } else if (livewireResult && livewireResult.redirect) {
-                        console.log('🔄 Redirecting to:', livewireResult.redirect);
-                        window.location.href = livewireResult.redirect;
-                    } else {
-                        console.log('❌ Unexpected result format:', livewireResult);
-                        document.getElementById('card-errors').textContent = livewireResult.message || 'Payment processing completed but order status unclear';
-                    }
-                    
-                } catch (livewireError) {
-                    console.log('❌ Livewire error:', livewireError);
-                    console.log('❌ Error details:', JSON.stringify(livewireError));
-                    
-                    let errorMessage = 'Order processing failed';
-                    if (livewireError.message) {
-                        errorMessage += ': ' + livewireError.message;
-                    } else if (typeof livewireError === 'string') {
-                        errorMessage += ': ' + livewireError;
-                    }
-                    
-                    document.getElementById('card-errors').textContent = errorMessage;
-                } finally {
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = originalText;
                 }
                 
             } catch (err) {
-                console.error('Payment error:', err);
-                document.getElementById('card-errors').textContent = 'Payment failed. Please try again.';
+                console.error('❌ Payment processing error:', err);
+                const errorMessage = err.message || 'Payment failed. Please try again.';
+                document.getElementById('card-errors').textContent = errorMessage;
+            } finally {
+                // Re-enable button
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalText;
             }
         });
+    } else {
+        console.log('❌ Form not found!');
     }
     
-    console.log('🎉 Setup complete - card field should work now!');
+    console.log('🎉 Setup complete - both payment methods should work now!');
 });
-
-// CONTINUOUS BUTTON SEARCH - Every 2 seconds for 10 seconds
-let buttonCheckCount = 0;
-const buttonInterval = setInterval(function() {
-    buttonCheckCount++;
-    const lateBtn = document.getElementById('place-order-btn');
-    console.log(`🔍 Button check #${buttonCheckCount}: ${lateBtn ? 'FOUND' : 'NOT FOUND'}`);
-    
-    if (lateBtn && !lateBtn.hasAttribute('data-tested')) {
-        console.log('✅ LATE BUTTON FOUND - Adding handler');
-        lateBtn.setAttribute('data-tested', 'true');
-        lateBtn.onclick = function(e) {
-            alert('LATE BUTTON CLICK WORKS!');
-            console.log('🚨 LATE BUTTON CLICK DETECTED');
-            e.preventDefault();
-            return false;
-        };
-        clearInterval(buttonInterval);
-    }
-    
-    if (buttonCheckCount >= 5) {
-        console.log('❌ STOPPED LOOKING FOR BUTTON AFTER 5 ATTEMPTS');
-        clearInterval(buttonInterval);
-    }
-}, 2000);
 </script>
