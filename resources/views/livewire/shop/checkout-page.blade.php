@@ -124,11 +124,11 @@
                     <div class="mt-6 space-y-2">
                         <label class="block font-semibold mb-1">Payment Method</label>
                         <label class="flex items-center space-x-2">
-                            <input type="radio" wire:model.live="payment_method" value="cod" class="accent-white">
+                            <input type="radio" name="payment_method" value="cod" class="accent-white" checked>
                             <span>Cash on Delivery</span>
                         </label>
                         <label class="flex items-center space-x-2">
-                            <input type="radio" wire:model.live="payment_method" value="card" class="accent-white">
+                            <input type="radio" name="payment_method" value="card" class="accent-white">
                             <span>Card Payment</span>
                         </label>
 
@@ -206,11 +206,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
         console.log('Payment method selected:', paymentMethod);
         
+        // Update Livewire property
+        @this.set('payment_method', paymentMethod);
+        
         if (paymentMethod === 'card') {
             // Show card section
             if (cardSection) {
                 cardSection.classList.remove('hidden');
-                console.log('✅ Card section shown');
+                console.log('✅ Card section shown, classList:', cardSection.classList.toString());
                 
                 // Mount Stripe element only once
                 if (!cardMounted) {
@@ -230,14 +233,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Hide card section
             if (cardSection) {
                 cardSection.classList.add('hidden');
-                console.log('✅ Card section hidden');
+                console.log('✅ Card section hidden, classList:', cardSection.classList.toString());
             }
         }
     }
     
     // Listen to payment method changes
     document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
-        radio.addEventListener('change', toggleCardSection);
+        radio.addEventListener('change', function() {
+            console.log('Radio button changed to:', this.value);
+            toggleCardSection();
+        });
     });
     
     // Initial toggle based on current selection
@@ -265,6 +271,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (form) {
         form.addEventListener('submit', async function(event) {
             const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+            console.log('Form submission - payment method:', paymentMethod);
+            
+            // Update Livewire property before submission
+            @this.set('payment_method', paymentMethod);
             
             if (paymentMethod !== 'card') {
                 return; // Let Livewire handle COD
