@@ -135,15 +135,23 @@
                         <!-- Stripe Card Details Section -->
                         @if($payment_method === 'card')
                             <div class="space-y-4 mt-4">
-                                <label class="block font-semibold">Card Details</label>
+                                <label class="block font-semibold">Card Details*</label>
+                                <p class="text-sm text-gray-400">Enter your card number, expiry date, and CVC</p>
                                 
                                 <!-- Stripe Elements Container -->
-                                <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded">
+                                <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px]">
                                     <!-- Stripe Elements will create form elements here -->
                                 </div>
                                 
                                 <!-- Stripe Errors -->
-                                <div id="card-errors" role="alert" class="text-red-500 text-sm"></div>
+                                <div id="card-errors" role="alert" class="text-red-500 text-sm min-h-[20px]"></div>
+                                
+                                <div class="text-xs text-gray-400">
+                                    <p>✓ Card number must be 16 digits</p>
+                                    <p>✓ Expiry date in MM/YY format</p>
+                                    <p>✓ CVC must be 3-4 digits</p>
+                                    <p>✓ Use test card: 4242 4242 4242 4242</p>
+                                </div>
                                 
                                 @error('payment_error')
                                     <p class="text-red-500 text-sm">{{ $message }}</p>
@@ -191,21 +199,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Create card element
-    const cardElement = elements.create('card');
+    // Create card element with proper validation
+    const cardElement = elements.create('card', {
+        style: {
+            base: {
+                fontSize: '16px',
+                color: '#ffffff',
+                '::placeholder': {
+                    color: '#9ca3af',
+                },
+            },
+            invalid: {
+                color: '#ef4444',
+            },
+        },
+    });
     let cardMounted = false;
+    let cardComplete = false;
+    let cardEmpty = true;
 
     // Function to mount/unmount card element based on payment method
     function toggleCardElement() {
         const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
         const cardContainer = document.getElementById('card-element');
+        const submitButton = document.querySelector('button[type="submit"]');
         
         if (paymentMethod === 'card' && !cardMounted) {
             cardElement.mount('#card-element');
             cardMounted = true;
+            // Disable submit until card is complete
+            submitButton.disabled = !cardComplete || cardEmpty;
         } else if (paymentMethod === 'cod' && cardMounted) {
             cardElement.unmount();
             cardMounted = false;
+            // Enable submit for COD
+            submitButton.disabled = false;
         }
     }
 
@@ -220,10 +248,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle real-time validation errors
     cardElement.on('change', function(event) {
         const displayError = document.getElementById('card-errors');
+        const submitButton = document.querySelector('button[type="submit"]');
+        
+        // Update card state
+        cardComplete = event.complete;
+        cardEmpty = event.empty;
+        
         if (event.error) {
             displayError.textContent = event.error.message;
+            submitButton.disabled = true;
         } else {
             displayError.textContent = '';
+            // Only enable if card is complete and valid
+            const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+            if (paymentMethod === 'card') {
+                submitButton.disabled = !cardComplete || cardEmpty;
+            }
         }
     });
 
@@ -237,6 +277,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         event.preventDefault();
+
+        // Check if card is complete and valid before processing
+        if (!cardComplete || cardEmpty) {
+            document.getElementById('card-errors').textContent = 'Please enter complete and valid card details.';
+            return;
+        }
 
         // Disable submit button
         const submitButton = form.querySelector('button[type="submit"]');
