@@ -138,27 +138,11 @@
                                 <label class="block font-semibold">Card Details*</label>
                                 <p class="text-sm text-gray-400">Use test card: 4242 4242 4242 4242</p>
                                 
-                                <!-- Card Number -->
+                                <!-- Single Card Element (simpler approach) -->
                                 <div>
-                                    <label class="block text-sm font-medium mb-1">Card Number</label>
-                                    <div id="card-number-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px]">
-                                        <!-- Stripe card number element -->
-                                    </div>
-                                </div>
-                                
-                                <!-- Expiry and CVC Row -->
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">Expiry Date</label>
-                                        <div id="card-expiry-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px]">
-                                            <!-- Stripe expiry element -->
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">CVC</label>
-                                        <div id="card-cvc-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px]">
-                                            <!-- Stripe CVC element -->
-                                        </div>
+                                    <label class="block text-sm font-medium mb-1">Card Information</label>
+                                    <div id="card-element" class="p-3 bg-gray-800 border border-gray-600 rounded min-h-[40px]">
+                                        <!-- Stripe card element will be mounted here -->
                                     </div>
                                 </div>
                                 
@@ -195,80 +179,47 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Stripe initialization starting...');
+    console.log('Starting Stripe initialization...');
     
     // Initialize Stripe
     const stripe = Stripe('{{ env('STRIPE_PUBLISHABLE_KEY') }}');
     const elements = stripe.elements();
 
-    // Create separate card elements
-    const cardNumberElement = elements.create('cardNumber', {
-        placeholder: '1234 1234 1234 1234',
+    // Create a single card element (this always works)
+    const cardElement = elements.create('card', {
         style: {
             base: {
                 fontSize: '16px',
                 color: '#ffffff',
-                backgroundColor: '#1f2937',
                 '::placeholder': {
                     color: '#9ca3af',
                 },
-            }
-        }
-    });
-    
-    const cardExpiryElement = elements.create('cardExpiry', {
-        placeholder: 'MM / YY',
-        style: {
-            base: {
-                fontSize: '16px',
-                color: '#ffffff',
-                backgroundColor: '#1f2937',
-                '::placeholder': {
-                    color: '#9ca3af',
-                },
-            }
-        }
-    });
-    
-    const cardCvcElement = elements.create('cardCvc', {
-        placeholder: '123',
-        style: {
-            base: {
-                fontSize: '16px',
-                color: '#ffffff',
-                backgroundColor: '#1f2937',
-                '::placeholder': {
-                    color: '#9ca3af',
-                },
-            }
-        }
+            },
+        },
     });
     
     let cardMounted = false;
 
-    // Function to mount/unmount card elements
+    // Function to mount/unmount card element
     function toggleCardElement() {
         const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
-        console.log('Payment method:', paymentMethod);
+        const cardContainer = document.getElementById('card-element');
         
-        if (paymentMethod === 'card') {
-            if (!cardMounted) {
-                try {
-                    cardNumberElement.mount('#card-number-element');
-                    cardExpiryElement.mount('#card-expiry-element');
-                    cardCvcElement.mount('#card-cvc-element');
-                    cardMounted = true;
-                    console.log('Stripe elements mounted successfully');
-                } catch (error) {
-                    console.error('Error mounting Stripe elements:', error);
-                }
+        console.log('Toggle called, payment method:', paymentMethod);
+        console.log('Card container found:', !!cardContainer);
+        
+        if (paymentMethod === 'card' && !cardMounted && cardContainer) {
+            try {
+                cardElement.mount('#card-element');
+                cardMounted = true;
+                console.log('✅ Stripe card element mounted successfully!');
+            } catch (error) {
+                console.error('❌ Error mounting card element:', error);
             }
         } else if (paymentMethod === 'cod' && cardMounted) {
-            cardNumberElement.unmount();
-            cardExpiryElement.unmount();
-            cardCvcElement.unmount();
+            cardElement.unmount();
             cardMounted = false;
-            console.log('Stripe elements unmounted');
+            console.log('Card element unmounted');
         }
     }
 
@@ -276,18 +227,19 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
         radio.addEventListener('change', function() {
             console.log('Payment method changed to:', this.value);
-            toggleCardElement();
+            setTimeout(toggleCardElement, 100);
         });
     });
 
-    // Initial setup - wait a bit for DOM to be ready
+    // Initial setup with delay to ensure DOM is ready
     setTimeout(function() {
+        console.log('Running initial toggle...');
         toggleCardElement();
-    }, 500);
+    }, 1000);
 
-    // Handle validation
-    cardNumberElement.on('change', function(event) {
-        console.log('Card number changed:', event);
+    // Handle card changes
+    cardElement.on('change', function(event) {
+        console.log('Card changed:', event);
         const displayError = document.getElementById('card-errors');
         if (event.error) {
             displayError.textContent = event.error.message;
@@ -303,7 +255,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
             
             if (paymentMethod !== 'card') {
-                return; // Let Livewire handle COD
+                console.log('COD payment, letting Livewire handle it');
+                return;
             }
 
             event.preventDefault();
@@ -316,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
                     type: 'card',
-                    card: cardNumberElement,
+                    card: cardElement,
                     billing_details: {
                         name: document.querySelector('input[wire\\:model="recipient_name"]').value,
                     }
@@ -330,19 +283,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                console.log('Payment method created:', stripePaymentMethod);
+                console.log('Payment method created successfully!');
                 @this.processStripePayment(stripePaymentMethod.id);
 
             } catch (err) {
-                console.error('Payment processing error:', err);
-                document.getElementById('card-errors').textContent = 'An error occurred.';
+                console.error('Payment error:', err);
+                document.getElementById('card-errors').textContent = 'Payment failed. Please try again.';
                 submitButton.disabled = false;
                 submitButton.innerHTML = '<span>Place Order</span>';
             }
         });
     }
 
-    console.log('Stripe initialization complete');
+    console.log('Stripe setup complete!');
 });
 </script>
 @endpush
