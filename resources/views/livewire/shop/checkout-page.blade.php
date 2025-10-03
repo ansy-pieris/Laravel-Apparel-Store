@@ -464,8 +464,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Send to Livewire backend
                     const result = await @this.processStripePayment(stripePaymentMethod.id);
-                    console.log('✅ Stripe payment completed successfully:', result);
-                    return;
+                    console.log('✅ Stripe payment result:', result);
+                    
+                    if (result && result.success) {
+                        console.log('🎉 Payment successful!');
+                        document.getElementById('card-errors').innerHTML = '<span style="color: #10b981;">✅ ' + result.message + '</span>';
+                        
+                        // Redirect if provided
+                        if (result.redirect) {
+                            setTimeout(() => {
+                                window.location.href = result.redirect;
+                            }, 1500);
+                        }
+                        return;
+                    } else {
+                        throw new Error(result?.message || 'Payment processing failed');
+                    }
                 }
                 
             } catch (err) {
@@ -483,5 +497,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     console.log('🎉 Setup complete - both payment methods should work now!');
+});
+
+// Listen for Livewire events
+window.addEventListener('orderCompleted', function() {
+    console.log('🎉 Order completed event received');
+    setTimeout(() => {
+        window.location.href = '/';
+    }, 2000);
 });
 </script>

@@ -154,9 +154,13 @@ class CheckoutPage extends Component
                 \Log::info('Payment succeeded, completing order');
                 $orderResult = $this->completeOrder();
                 if ($orderResult) {
+                    // Flash success message for redirect
+                    $deliveryDate = now()->addDays(4)->format('M j, Y');
+                    session()->flash('order_success', "Thank you for your purchase! Your payment has been processed successfully. Order will be delivered by {$deliveryDate}.");
+                    $this->dispatch('orderCompleted');
                     return ['success' => true, 'message' => 'Order placed successfully', 'redirect' => route('home')];
                 } else {
-                    return ['success' => true, 'message' => 'Order placed successfully'];
+                    return ['success' => false, 'message' => 'Order creation failed'];
                 }
             } else {
                 // Payment failed
@@ -305,11 +309,13 @@ class CheckoutPage extends Component
                 }
             }
 
-            // Create the order
+            // Create the order  
             $order = Order::create([
                 'user_id' => Auth::id(),
-                'total_price' => $this->total, // Changed from total_amount to total_price
+                'total_amount' => $this->total,
                 'status' => 'pending',
+                'payment_method' => $this->payment_method,
+                'payment_status' => 'pending',
             ]);
 
             // Create order items and reduce stock
