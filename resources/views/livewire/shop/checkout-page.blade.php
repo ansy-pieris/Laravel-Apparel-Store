@@ -133,7 +133,7 @@
                         </label>
 
                         <!-- Stripe Card Details Section -->
-                        <div class="space-y-4 mt-4" id="card-section" style="display: {{ $payment_method === 'card' ? 'block' : 'none' }}">
+                        <div wire:ignore class="space-y-4 mt-4 hidden" id="card-section">
                             <label class="block font-semibold">Card Details*</label>
                             <p class="text-sm text-gray-400">Use test card: 4242 4242 4242 4242</p>
                             
@@ -176,9 +176,13 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Stripe immediately
+    console.log('🚀 Stripe initialized with wire:ignore protection');
+    
+    // Initialize Stripe
     const stripe = Stripe('pk_test_51S0gYfKyfRZGi0cj0Q2x7dEWuN4totRdghbjZQa8bzIA7mPjSeD6aAYgjbHOwahhhXhgKAFHT3tbukYLzCP8IwPq00kpxq5pIK');
     const elements = stripe.elements();
+    
+    // Create card element with proper styling
     const cardElement = elements.create('card', {
         style: {
             base: {
@@ -188,38 +192,63 @@ document.addEventListener('DOMContentLoaded', function() {
                     color: '#9ca3af',
                 },
             },
+            invalid: {
+                color: '#ef4444',
+            },
         },
     });
     
     let cardMounted = false;
+    const cardSection = document.getElementById('card-section');
     
-    // Mount card element when needed
-    function mountCard() {
-        if (!cardMounted) {
-            cardElement.mount('#card-element');
-            cardMounted = true;
+    // Function to show/hide card section and mount Stripe element
+    function toggleCardSection() {
+        const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
+        
+        if (paymentMethod === 'card') {
+            // Show card section
+            cardSection.classList.remove('hidden');
+            
+            // Mount Stripe element only once
+            if (!cardMounted) {
+                try {
+                    cardElement.mount('#card-element');
+                    cardMounted = true;
+                    console.log('✅ Stripe card element mounted successfully');
+                    
+                    // Focus the card element
+                    setTimeout(() => cardElement.focus(), 100);
+                } catch (error) {
+                    console.error('❌ Error mounting Stripe element:', error);
+                }
+            }
+        } else {
+            // Hide card section
+            cardSection.classList.add('hidden');
         }
     }
     
-    // Handle payment method changes
-    document.addEventListener('livewire:updated', function() {
-        const cardSection = document.getElementById('card-section');
-        const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
-        
-        if (paymentMethod === 'card' && cardSection && cardSection.style.display !== 'none') {
-            mountCard();
+    // Listen to payment method changes
+    document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+        radio.addEventListener('change', toggleCardSection);
+    });
+    
+    // Initial toggle based on current selection
+    setTimeout(toggleCardSection, 100);
+    
+    // Handle card validation
+    cardElement.on('change', function(event) {
+        const displayError = document.getElementById('card-errors');
+        if (event.error) {
+            displayError.textContent = event.error.message;
+        } else {
+            displayError.textContent = '';
         }
     });
     
-    // Initial mount if card is already selected
-    setTimeout(function() {
-        const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value;
-        const cardSection = document.getElementById('card-section');
-        
-        if (paymentMethod === 'card' && cardSection && cardSection.style.display !== 'none') {
-            mountCard();
-        }
-    }, 500);
+    cardElement.on('ready', function() {
+        console.log('✅ Stripe card element is ready for input!');
+    });
     
     // Handle form submission
     const form = document.querySelector('form');
@@ -230,25 +259,42 @@ document.addEventListener('DOMContentLoaded', function() {
             if (paymentMethod !== 'card') {
                 return; // Let Livewire handle COD
             }
-
+            
             event.preventDefault();
             
-            const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
-                type: 'card',
-                card: cardElement,
-                billing_details: {
-                    name: document.querySelector('input[wire\\:model="recipient_name"]').value,
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span>Processing Payment...</span>';
+            
+            try {
+                const {error, paymentMethod: stripePaymentMethod} = await stripe.createPaymentMethod({
+                    type: 'card',
+                    card: cardElement,
+                    billing_details: {
+                        name: document.querySelector('input[wire\\:model="recipient_name"]').value,
+                    }
+                });
+                
+                if (error) {
+                    document.getElementById('card-errors').textContent = error.message;
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                    return;
                 }
-            });
-
-            if (error) {
-                document.getElementById('card-errors').textContent = error.message;
-                return;
+                
+                // Send to Livewire backend
+                @this.processStripePayment(stripePaymentMethod.id);
+                
+            } catch (err) {
+                console.error('Payment error:', err);
+                document.getElementById('card-errors').textContent = 'Payment failed. Please try again.';
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
             }
-
-            // Process payment with Livewire
-            @this.processStripePayment(stripePaymentMethod.id);
         });
     }
+    
+    console.log('🎉 Setup complete - card field should work now!');
 });
 </script>
